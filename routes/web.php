@@ -13,6 +13,7 @@ Route::get('/dashboard', [DepartmentController::class, 'index'])
     ->name('dashboard');
 
 Route::post('/departments', [DepartmentController::class, 'store'])->name('departments.store');
+Route::put('/departments/{department}', [DepartmentController::class, 'update'])->name('departments.update');
 
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';
