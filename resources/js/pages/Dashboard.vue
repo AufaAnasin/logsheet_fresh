@@ -232,6 +232,7 @@ const updateDepartmentID = (departmentID: string) => {
 </script>
 
 <template>
+
     <Head title="Dashboard" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
@@ -239,7 +240,7 @@ const updateDepartmentID = (departmentID: string) => {
             <div class="grid auto-rows-min gap-4 md:grid-cols-3">
                 <!-- Form for adding new department -->
                 <div
-                    class="relative aspect-video overflow-hidden rounded-xl border border-sidebar-border/2 dark:border-gray-800 p-3">
+                    class="relative flex flex-col min-h-full rounded-xl border border-gray-200 dark:border-gray-800 p-3">
                     <p><b>Add Department</b></p>
                     <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
                         <Label for="department_name">Name</Label>
@@ -255,15 +256,15 @@ const updateDepartmentID = (departmentID: string) => {
                         <span v-if="createDepartmentForm.errors.desc" class="text-red-500 text-sm">{{
                             createDepartmentForm.errors.desc }}</span>
                     </div>
-                    <Button class="mt-3 w-full" @click="submitDepartment" :disabled="createDepartmentForm.processing">
+                    <Button class="mt-auto w-full" @click="submitDepartment"
+                        :disabled="createDepartmentForm.processing">
                         <CirclePlus class="w-4 h-4 mr-2" />
                         {{ createDepartmentForm.processing ? 'Submitting...' : 'Submit Department' }}
                     </Button>
                 </div>
 
                 <!-- Form for adding new area -->
-                <div
-                    class="relative aspect-video rounded-xl border border-sidebar-border/2 dark:border-gray-800 p-3">
+                <div class="relative aspect-video rounded-xl border border-sidebar-border/2 dark:border-gray-800 p-3">
                     <p><b>Create Area</b></p>
                     <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
                         <Label for="area_name">Area Name</Label>
@@ -278,9 +279,10 @@ const updateDepartmentID = (departmentID: string) => {
                             <PopoverTrigger as-child>
                                 <Button variant="outline" role="combobox" :aria-expanded="isAreaComboboxOpen"
                                     class="w-full justify-between">
-                                    {{ selectedDepartmentID
-                                        ? localDepartments.find((dep) => dep.DepartmentID.toString() === selectedDepartmentID)?.name
-                                        : 'Select department...' }}
+                                    {{selectedDepartmentID
+                                        ? localDepartments.find((dep) => dep.DepartmentID.toString() ===
+                                            selectedDepartmentID)?.name
+                                    : 'Select department...' }}
                                     <ChevronsUpDown class="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                 </Button>
                             </PopoverTrigger>
@@ -290,20 +292,16 @@ const updateDepartmentID = (departmentID: string) => {
                                     <CommandEmpty>No department found.</CommandEmpty>
                                     <CommandList>
                                         <CommandGroup>
-                                            <CommandItem
-                                                v-for="department in localDepartments"
+                                            <CommandItem v-for="department in localDepartments"
                                                 :key="department.DepartmentID"
                                                 :value="department.DepartmentID.toString()"
-                                                @select="updateDepartmentID(department.DepartmentID.toString())"
-                                            >
-                                                <Check
-                                                    :class="cn(
-                                                        'mr-2 h-4 w-4',
-                                                        selectedDepartmentID === department.DepartmentID.toString()
-                                                            ? 'opacity-100'
-                                                            : 'opacity-0'
-                                                    )"
-                                                />
+                                                @select="updateDepartmentID(department.DepartmentID.toString())">
+                                                <Check :class="cn(
+                                                    'mr-2 h-4 w-4',
+                                                    selectedDepartmentID === department.DepartmentID.toString()
+                                                        ? 'opacity-100'
+                                                        : 'opacity-0'
+                                                )" />
                                                 {{ department.name }}
                                             </CommandItem>
                                         </CommandGroup>
@@ -390,15 +388,17 @@ const updateDepartmentID = (departmentID: string) => {
                         <Label for="edit_name" class="text-right">Name</Label>
                         <Input id="edit_name" v-model="editDepartmentForm.name" class="col-span-3"
                             @input="editDepartmentForm.errors.name = null" />
-                        <span v-if="editDepartmentForm.errors.name" class="text-red-500 text-sm col-start-2 col-span-3">{{
-                            editDepartmentForm.errors.name }}</span>
+                        <span v-if="editDepartmentForm.errors.name"
+                            class="text-red-500 text-sm col-start-2 col-span-3">{{
+                                editDepartmentForm.errors.name }}</span>
                     </div>
                     <div class="grid grid-cols-4 items-center gap-4">
                         <Label for="edit_desc" class="text-right">Description</Label>
                         <Input id="edit_desc" v-model="editDepartmentForm.desc" class="col-span-3"
                             @input="editDepartmentForm.errors.desc = null" />
-                        <span v-if="editDepartmentForm.errors.desc" class="text-red-500 text-sm col-start-2 col-span-3">{{
-                            editDepartmentForm.errors.desc }}</span>
+                        <span v-if="editDepartmentForm.errors.desc"
+                            class="text-red-500 text-sm col-start-2 col-span-3">{{
+                                editDepartmentForm.errors.desc }}</span>
                     </div>
                 </div>
                 <DialogFooter>
