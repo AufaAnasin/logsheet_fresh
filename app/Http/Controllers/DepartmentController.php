@@ -43,6 +43,22 @@ class DepartmentController extends Controller
             ]);
     }
 
+    public function destroy(Department $department)
+    {
+        $department->delete();
+
+        return redirect()->route('dashboard')->with('success', 'Department deleted successfully!')
+            ->with([
+                'departments' => Department::all()->map(function ($department) {
+                    return [
+                        'DepartmentID' => $department->DepartmentID,
+                        'name' => $department->name,
+                        'desc' => $department->desc,
+                    ];
+                }),
+            ]);
+    }
+
     public function update(Request $request, Department $department)
     {
         $validated = $request->validate([
