@@ -5,7 +5,7 @@ import { Head, useForm } from '@inertiajs/vue3';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { CirclePlus, Ellipsis, SquarePen, X } from 'lucide-vue-next';
+import { CirclePlus, Check, ChevronsUpDown, Ellipsis, SquarePen, X } from 'lucide-vue-next';
 import PlaceholderPattern from '../components/PlaceholderPattern.vue';
 import {
     Table,
@@ -42,6 +42,20 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from '@/components/ui/command';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 import { ref, reactive } from 'vue';
 
 // Define department interface
@@ -68,17 +82,17 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 // Form for adding new department
-const createForm = useForm({
+const createDepartmentForm = useForm({
     name: '',
     desc: '',
 });
 
-// Handle create form submission
+// Handle create department form submission
 const submitDepartment = () => {
-    createForm.post('/departments', {
+    createDepartmentForm.post('/departments', {
         preserveState: true,
         onSuccess: (response) => {
-            createForm.reset();
+            createDepartmentForm.reset();
             alert('Department created successfully!');
             const newDepartment = response.props.departments.find(
                 (dep: Department) => !localDepartments.some((d) => d.DepartmentID === dep.DepartmentID)
@@ -95,30 +109,30 @@ const submitDepartment = () => {
     });
 };
 
-// Edit dialog state
+// Edit department dialog state
 const isEditDialogOpen = ref(false);
 const selectedDepartment = ref<Department | null>(null);
 
 // Form for editing department
-const editForm = useForm({
+const editDepartmentForm = useForm({
     name: '',
     desc: '',
 });
 
-// Open edit dialog
+// Open edit department dialog
 const openEditDialog = (department: Department) => {
     selectedDepartment.value = department;
-    editForm.reset();
-    editForm.clearErrors();
-    editForm.name = department.name;
-    editForm.desc = department.desc || '';
+    editDepartmentForm.reset();
+    editDepartmentForm.clearErrors();
+    editDepartmentForm.name = department.name;
+    editDepartmentForm.desc = department.desc || '';
     isEditDialogOpen.value = true;
 };
 
-// Handle edit form submission
+// Handle edit department form submission
 const updateDepartment = () => {
     if (!selectedDepartment.value) return;
-    editForm.put(`/departments/${selectedDepartment.value.DepartmentID}`, {
+    editDepartmentForm.put(`/departments/${selectedDepartment.value.DepartmentID}`, {
         preserveState: true,
         onSuccess: (response) => {
             alert('Department updated successfully!');
@@ -143,23 +157,23 @@ const updateDepartment = () => {
     });
 };
 
-// Delete dialog state
+// Delete department dialog state
 const isDeleteDialogOpen = ref(false);
 const departmentToDelete = ref<Department | null>(null);
 
 // Form for deleting department
-const deleteForm = useForm({});
+const deleteDepartmentForm = useForm({});
 
-// Open delete dialog
+// Open delete department dialog
 const openDeleteDialog = (department: Department) => {
     departmentToDelete.value = department;
     isDeleteDialogOpen.value = true;
 };
 
-// Handle delete confirmation
+// Handle delete department confirmation
 const deleteDepartment = () => {
     if (!departmentToDelete.value) return;
-    deleteForm.delete(`/departments/${departmentToDelete.value.DepartmentID}`, {
+    deleteDepartmentForm.delete(`/departments/${departmentToDelete.value.DepartmentID}`, {
         preserveState: true,
         onSuccess: () => {
             alert('Department deleted successfully!');
@@ -179,6 +193,42 @@ const deleteDepartment = () => {
         },
     });
 };
+
+// Form for adding new area
+const createAreaForm = useForm({
+    name: '',
+    DepartmentID: '',
+    desc: '',
+});
+
+// Combobox state for area department selection
+const isAreaComboboxOpen = ref(false);
+const selectedDepartmentID = ref('');
+
+// Handle area form submission
+const submitArea = () => {
+    createAreaForm.post('/areas', {
+        preserveState: true,
+        onSuccess: () => {
+            createAreaForm.reset();
+            selectedDepartmentID.value = '';
+            alert('Area created successfully!');
+        },
+        onError: (errors) => {
+            console.error(errors);
+            const errorMessage = errors.name || errors.DepartmentID || 'Failed to create area. Check the form inputs.';
+            alert(errorMessage);
+        },
+    });
+};
+
+// Update DepartmentID when combobox selection changes
+const updateDepartmentID = (departmentID: string) => {
+    createAreaForm.DepartmentID = departmentID;
+    createAreaForm.errors.DepartmentID = null;
+    selectedDepartmentID.value = departmentID;
+    isAreaComboboxOpen.value = false;
+};
 </script>
 
 <template>
@@ -194,29 +244,90 @@ const deleteDepartment = () => {
                     <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
                         <Label for="department_name">Name</Label>
                         <Input id="department_name" type="text" placeholder="Put Department name ..."
-                            v-model="createForm.name" @input="createForm.errors.name = null" />
-                        <span v-if="createForm.errors.name" class="text-red-500 text-sm">{{
-                            createForm.errors.name }}</span>
+                            v-model="createDepartmentForm.name" @input="createDepartmentForm.errors.name = null" />
+                        <span v-if="createDepartmentForm.errors.name" class="text-red-500 text-sm">{{
+                            createDepartmentForm.errors.name }}</span>
                     </div>
-
                     <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
                         <Label for="department_description">Description</Label>
                         <Input id="department_description" type="text" placeholder="Input Department description ..."
-                            v-model="createForm.desc" @input="createForm.errors.desc = null" />
-                        <span v-if="createForm.errors.desc" class="text-red-500 text-sm">{{
-                            createForm.errors.desc }}</span>
+                            v-model="createDepartmentForm.desc" @input="createDepartmentForm.errors.desc = null" />
+                        <span v-if="createDepartmentForm.errors.desc" class="text-red-500 text-sm">{{
+                            createDepartmentForm.errors.desc }}</span>
                     </div>
-                    <Button class="mt-2 w-full" @click="submitDepartment" :disabled="createForm.processing">
+                    <Button class="mt-3 w-full" @click="submitDepartment" :disabled="createDepartmentForm.processing">
                         <CirclePlus class="w-4 h-4 mr-2" />
-                        {{ createForm.processing ? 'Submitting...' : 'Submit Department' }}
+                        {{ createDepartmentForm.processing ? 'Submitting...' : 'Submit Department' }}
                     </Button>
                 </div>
 
-                <!-- Placeholder cards -->
+                <!-- Form for adding new area -->
                 <div
-                    class="relative aspect-video overflow-hidden rounded-xl border border-sidebar-border/2 dark:border-gray-800 p-3">
-                    <PlaceholderPattern />
+                    class="relative aspect-video rounded-xl border border-sidebar-border/2 dark:border-gray-800 p-3">
+                    <p><b>Create Area</b></p>
+                    <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
+                        <Label for="area_name">Area Name</Label>
+                        <Input id="area_name" type="text" placeholder="Input Area name ..."
+                            v-model="createAreaForm.name" @input="createAreaForm.errors.name = null" />
+                        <span v-if="createAreaForm.errors.name" class="text-red-500 text-sm">{{
+                            createAreaForm.errors.name }}</span>
+                    </div>
+                    <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
+                        <Label for="area_department">Department</Label>
+                        <Popover v-model:open="isAreaComboboxOpen">
+                            <PopoverTrigger as-child>
+                                <Button variant="outline" role="combobox" :aria-expanded="isAreaComboboxOpen"
+                                    class="w-full justify-between">
+                                    {{ selectedDepartmentID
+                                        ? localDepartments.find((dep) => dep.DepartmentID.toString() === selectedDepartmentID)?.name
+                                        : 'Select department...' }}
+                                    <ChevronsUpDown class="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent class="w-full p-0">
+                                <Command>
+                                    <CommandInput placeholder="Search department..." />
+                                    <CommandEmpty>No department found.</CommandEmpty>
+                                    <CommandList>
+                                        <CommandGroup>
+                                            <CommandItem
+                                                v-for="department in localDepartments"
+                                                :key="department.DepartmentID"
+                                                :value="department.DepartmentID.toString()"
+                                                @select="updateDepartmentID(department.DepartmentID.toString())"
+                                            >
+                                                <Check
+                                                    :class="cn(
+                                                        'mr-2 h-4 w-4',
+                                                        selectedDepartmentID === department.DepartmentID.toString()
+                                                            ? 'opacity-100'
+                                                            : 'opacity-0'
+                                                    )"
+                                                />
+                                                {{ department.name }}
+                                            </CommandItem>
+                                        </CommandGroup>
+                                    </CommandList>
+                                </Command>
+                            </PopoverContent>
+                        </Popover>
+                        <span v-if="createAreaForm.errors.DepartmentID" class="text-red-500 text-sm">{{
+                            createAreaForm.errors.DepartmentID }}</span>
+                    </div>
+                    <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
+                        <Label for="area_description">Description</Label>
+                        <Input id="area_description" type="text" placeholder="Input Area description ..."
+                            v-model="createAreaForm.desc" @input="createAreaForm.errors.desc = null" />
+                        <span v-if="createAreaForm.errors.desc" class="text-red-500 text-sm">{{
+                            createAreaForm.errors.desc }}</span>
+                    </div>
+                    <Button class="mt-3 w-full" @click="submitArea" :disabled="createAreaForm.processing">
+                        <CirclePlus class="w-4 h-4 mr-2" />
+                        {{ createAreaForm.processing ? 'Submitting...' : 'Submit Area' }}
+                    </Button>
                 </div>
+
+                <!-- Placeholder card -->
                 <div
                     class="relative aspect-video overflow-hidden rounded-xl border border-sidebar-border/2 dark:border-gray-800 p-3">
                     <PlaceholderPattern />
@@ -243,7 +354,9 @@ const deleteDepartment = () => {
                             <TableCell>
                                 <div class="flex items-center space-x-2">
                                     <DropdownMenu>
-                                        <DropdownMenuTrigger><Ellipsis /></DropdownMenuTrigger>
+                                        <DropdownMenuTrigger>
+                                            <Ellipsis />
+                                        </DropdownMenuTrigger>
                                         <DropdownMenuContent>
                                             <DropdownMenuLabel>Select Action</DropdownMenuLabel>
                                             <DropdownMenuSeparator />
@@ -275,23 +388,23 @@ const deleteDepartment = () => {
                 <div class="grid gap-4 py-4">
                     <div class="grid grid-cols-4 items-center gap-4">
                         <Label for="edit_name" class="text-right">Name</Label>
-                        <Input id="edit_name" v-model="editForm.name" class="col-span-3"
-                            @input="editForm.errors.name = null" />
-                        <span v-if="editForm.errors.name" class="text-red-500 text-sm col-start-2 col-span-3">{{
-                            editForm.errors.name }}</span>
+                        <Input id="edit_name" v-model="editDepartmentForm.name" class="col-span-3"
+                            @input="editDepartmentForm.errors.name = null" />
+                        <span v-if="editDepartmentForm.errors.name" class="text-red-500 text-sm col-start-2 col-span-3">{{
+                            editDepartmentForm.errors.name }}</span>
                     </div>
                     <div class="grid grid-cols-4 items-center gap-4">
                         <Label for="edit_desc" class="text-right">Description</Label>
-                        <Input id="edit_desc" v-model="editForm.desc" class="col-span-3"
-                            @input="editForm.errors.desc = null" />
-                        <span v-if="editForm.errors.desc" class="text-red-500 text-sm col-start-2 col-span-3">{{
-                            editForm.errors.desc }}</span>
+                        <Input id="edit_desc" v-model="editDepartmentForm.desc" class="col-span-3"
+                            @input="editDepartmentForm.errors.desc = null" />
+                        <span v-if="editDepartmentForm.errors.desc" class="text-red-500 text-sm col-start-2 col-span-3">{{
+                            editDepartmentForm.errors.desc }}</span>
                     </div>
                 </div>
                 <DialogFooter>
                     <Button type="button" variant="outline" @click="isEditDialogOpen = false">Cancel</Button>
-                    <Button type="submit" @click="updateDepartment" :disabled="editForm.processing">
-                        {{ editForm.processing ? 'Saving...' : 'Save Changes' }}
+                    <Button type="submit" @click="updateDepartment" :disabled="editDepartmentForm.processing">
+                        {{ editDepartmentForm.processing ? 'Saving...' : 'Save Changes' }}
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -303,13 +416,15 @@ const deleteDepartment = () => {
                 <AlertDialogHeader>
                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete the department "{{ departmentToDelete?.name }}" from the database.
+                        This action cannot be undone. This will permanently delete the department "{{
+                            departmentToDelete?.name
+                        }}" from the database.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogCancel @click="isDeleteDialogOpen = false">Cancel</AlertDialogCancel>
-                    <AlertDialogAction @click="deleteDepartment" :disabled="deleteForm.processing">
-                        {{ deleteForm.processing ? 'Deleting...' : 'Delete' }}
+                    <AlertDialogAction @click="deleteDepartment" :disabled="deleteDepartmentForm.processing">
+                        {{ deleteDepartmentForm.processing ? 'Deleting...' : 'Delete' }}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
