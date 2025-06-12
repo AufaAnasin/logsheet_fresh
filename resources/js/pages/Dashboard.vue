@@ -7,8 +7,6 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { CirclePlus, Ellipsis, SquarePen, X } from 'lucide-vue-next';
 import PlaceholderPattern from '../components/PlaceholderPattern.vue';
-
-// table
 import {
     Table,
     TableBody,
@@ -18,9 +16,6 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-
-// dropdown menu
-
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -28,7 +23,16 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+} from '@/components/ui/dropdown-menu';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { ref, reactive } from 'vue';
 
 // Define department interface
 interface Department {
@@ -38,10 +42,14 @@ interface Department {
 }
 
 // Receive departments from Laravel
-defineProps<{
+const props = defineProps<{
     departments: Department[];
 }>();
 
+// Reactive departments for dynamic updates
+const localDepartments = reactive(props.departments.slice());
+
+// Breadcrumbs
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Dashboard',
@@ -49,24 +57,77 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-// Initialize Inertia form
-const form = useForm({
+// Form for adding new department
+const createForm = useForm({
     name: '',
     desc: '',
 });
 
-// Handle form submission
+// Handle create form submission
 const submitDepartment = () => {
-    form.post('/departments', {
+    createForm.post('/departments', {
         preserveState: true,
-        onSuccess: () => {
-            form.reset();
+        onSuccess: (response) => {
+            createForm.reset();
             alert('Department created successfully!');
+            const newDepartment = response.props.departments.find(
+                (dep: Department) => !localDepartments.some((d) => d.DepartmentID === dep.DepartmentID)
+            );
+            if (newDepartment) {
+                localDepartments.push(newDepartment);
+            }
         },
         onError: (errors) => {
             console.error(errors);
-            // Display specific validation error or a generic message
             const errorMessage = errors.name || 'Failed to create department. Check the form inputs.';
+            alert(errorMessage);
+        },
+    });
+};
+
+// Dialog state
+const isEditDialogOpen = ref(false);
+const selectedDepartment = ref<Department | null>(null);
+
+// Form for editing department
+const editForm = useForm({
+    name: '',
+    desc: '',
+});
+
+// Open edit dialog
+const openEditDialog = (department: Department) => {
+    selectedDepartment.value = department;
+    editForm.reset();
+    editForm.clearErrors();
+    editForm.name = department.name;
+    editForm.desc = department.desc || '';
+    isEditDialogOpen.value = true;
+};
+
+// Handle edit form submission
+const updateDepartment = () => {
+    if (!selectedDepartment.value) return;
+    editForm.put(`/departments/${selectedDepartment.value.DepartmentID}`, {
+        preserveState: true,
+        onSuccess: (response) => {
+            alert('Department updated successfully!');
+            isEditDialogOpen.value = false;
+            const updatedDepartment = response.props.departments.find(
+                (dep: Department) => dep.DepartmentID === selectedDepartment.value!.DepartmentID
+            );
+            if (updatedDepartment) {
+                const index = localDepartments.findIndex(
+                    (dep) => dep.DepartmentID === updatedDepartment.DepartmentID
+                );
+                if (index !== -1) {
+                    localDepartments[index] = updatedDepartment;
+                }
+            }
+        },
+        onError: (errors) => {
+            console.error(errors);
+            const errorMessage = errors.name || 'Failed to update department. Check the form inputs.';
             alert(errorMessage);
         },
     });
@@ -74,7 +135,6 @@ const submitDepartment = () => {
 </script>
 
 <template>
-
     <Head title="Dashboard" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
@@ -87,19 +147,21 @@ const submitDepartment = () => {
                     <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
                         <Label for="department_name">Name</Label>
                         <Input id="department_name" type="text" placeholder="Put Department name ..."
-                            v-model="form.name" @input="form.errors.name = null" />
-                        <span v-if="form.errors.name" class="text-red-500 text-sm">{{ form.errors.name }}</span>
+                            v-model="createForm.name" @input="createForm.errors.name = null" />
+                        <span v-if="createForm.errors.name" class="text-red-500 text-sm">{{
+                            createForm.errors.name }}</span>
                     </div>
 
                     <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
                         <Label for="department_description">Description</Label>
                         <Input id="department_description" type="text" placeholder="Input Department description ..."
-                            v-model="form.desc" @input="form.errors.desc = null" />
-                        <span v-if="form.errors.desc" class="text-red-500 text-sm">{{ form.errors.desc }}</span>
+                            v-model="createForm.desc" @input="createForm.errors.desc = null" />
+                        <span v-if="createForm.errors.desc" class="text-red-500 text-sm">{{
+                            createForm.errors.desc }}</span>
                     </div>
-                    <Button class="mt-2 w-full" @click="submitDepartment" :disabled="form.processing">
+                    <Button class="mt-2 w-full" @click="submitDepartment" :disabled="createForm.processing">
                         <CirclePlus class="w-4 h-4 mr-2" />
-                        {{ form.processing ? 'Submitting...' : 'Submit Department' }}
+                        {{ createForm.processing ? 'Submitting...' : 'Submit Department' }}
                     </Button>
                 </div>
 
@@ -127,7 +189,7 @@ const submitDepartment = () => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        <TableRow v-for="department in departments" :key="department.DepartmentID">
+                        <TableRow v-for="department in localDepartments" :key="department.DepartmentID">
                             <TableCell class="font-medium">{{ department.DepartmentID }}</TableCell>
                             <TableCell>{{ department.name }}</TableCell>
                             <TableCell>{{ department.desc || 'No description' }}</TableCell>
@@ -137,8 +199,10 @@ const submitDepartment = () => {
                                     <DropdownMenuContent>
                                         <DropdownMenuLabel>Select Action</DropdownMenuLabel>
                                         <DropdownMenuSeparator />
-                                        <DropdownMenuItem><SquarePen />Edit</DropdownMenuItem>
-                                        <DropdownMenuItem><X />Delete</DropdownMenuItem>
+                                        <DropdownMenuItem @click="openEditDialog(department)">
+                                            <SquarePen class="w-4 h-4 mr-2" />Edit
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem><X class="w-4 h-4 mr-2" />Delete</DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             </TableCell>
@@ -147,5 +211,39 @@ const submitDepartment = () => {
                 </Table>
             </div>
         </div>
+
+        <!-- Edit Department Dialog -->
+        <Dialog v-model:open="isEditDialogOpen">
+            <DialogContent class="sm:max-w-[425px]">
+                <DialogHeader>
+                    <DialogTitle>Edit Department</DialogTitle>
+                    <DialogDescription>
+                        Make changes to the department details here. Click save when you're done.
+                    </DialogDescription>
+                </DialogHeader>
+                <div class="grid gap-4 py-4">
+                    <div class="grid grid-cols-4 items-center gap-4">
+                        <Label for="edit_name" class="text-right">Name</Label>
+                        <Input id="edit_name" v-model="editForm.name" class="col-span-3"
+                            @input="editForm.errors.name = null" />
+                        <span v-if="editForm.errors.name" class="text-red-500 text-sm col-start-2 col-span-3">{{
+                            editForm.errors.name }}</span>
+                    </div>
+                    <div class="grid grid-cols-4 items-center gap-4">
+                        <Label for="edit_desc" class="text-right">Description</Label>
+                        <Input id="edit_desc" v-model="editForm.desc" class="col-span-3"
+                            @input="editForm.errors.desc = null" />
+                        <span v-if="editForm.errors.desc" class="text-red-500 text-sm col-start-2 col-span-3">{{
+                            editForm.errors.desc }}</span>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button type="button" variant="outline" @click="isEditDialogOpen = false">Cancel</Button>
+                    <Button type="submit" @click="updateDepartment" :disabled="editForm.processing">
+                        {{ editForm.processing ? 'Saving...' : 'Save Changes' }}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </AppLayout>
 </template>
