@@ -32,6 +32,16 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { ref, reactive } from 'vue';
 
 // Define department interface
@@ -85,7 +95,7 @@ const submitDepartment = () => {
     });
 };
 
-// Dialog state
+// Edit dialog state
 const isEditDialogOpen = ref(false);
 const selectedDepartment = ref<Department | null>(null);
 
@@ -129,6 +139,43 @@ const updateDepartment = () => {
             console.error(errors);
             const errorMessage = errors.name || 'Failed to update department. Check the form inputs.';
             alert(errorMessage);
+        },
+    });
+};
+
+// Delete dialog state
+const isDeleteDialogOpen = ref(false);
+const departmentToDelete = ref<Department | null>(null);
+
+// Form for deleting department
+const deleteForm = useForm({});
+
+// Open delete dialog
+const openDeleteDialog = (department: Department) => {
+    departmentToDelete.value = department;
+    isDeleteDialogOpen.value = true;
+};
+
+// Handle delete confirmation
+const deleteDepartment = () => {
+    if (!departmentToDelete.value) return;
+    deleteForm.delete(`/departments/${departmentToDelete.value.DepartmentID}`, {
+        preserveState: true,
+        onSuccess: () => {
+            alert('Department deleted successfully!');
+            isDeleteDialogOpen.value = false;
+            const index = localDepartments.findIndex(
+                (dep) => dep.DepartmentID === departmentToDelete.value!.DepartmentID
+            );
+            if (index !== -1) {
+                localDepartments.splice(index, 1);
+            }
+            departmentToDelete.value = null;
+        },
+        onError: (errors) => {
+            console.error(errors);
+            alert('Failed to delete department.');
+            isDeleteDialogOpen.value = false;
         },
     });
 };
@@ -194,17 +241,21 @@ const updateDepartment = () => {
                             <TableCell>{{ department.name }}</TableCell>
                             <TableCell>{{ department.desc || 'No description' }}</TableCell>
                             <TableCell>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger><Ellipsis /></DropdownMenuTrigger>
-                                    <DropdownMenuContent>
-                                        <DropdownMenuLabel>Select Action</DropdownMenuLabel>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem @click="openEditDialog(department)">
-                                            <SquarePen class="w-4 h-4 mr-2" />Edit
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem><X class="w-4 h-4 mr-2" />Delete</DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
+                                <div class="flex items-center space-x-2">
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger><Ellipsis /></DropdownMenuTrigger>
+                                        <DropdownMenuContent>
+                                            <DropdownMenuLabel>Select Action</DropdownMenuLabel>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem @click="openEditDialog(department)">
+                                                <SquarePen class="w-4 h-4 mr-2" />Edit
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem @click="openDeleteDialog(department)">
+                                                <X class="w-4 h-4 mr-2" />Delete
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
                             </TableCell>
                         </TableRow>
                     </TableBody>
@@ -245,5 +296,23 @@ const updateDepartment = () => {
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+
+        <!-- Delete Department Alert Dialog -->
+        <AlertDialog v-model:open="isDeleteDialogOpen">
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete the department "{{ departmentToDelete?.name }}" from the database.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel @click="isDeleteDialogOpen = false">Cancel</AlertDialogCancel>
+                    <AlertDialogAction @click="deleteDepartment" :disabled="deleteForm.processing">
+                        {{ deleteForm.processing ? 'Deleting...' : 'Delete' }}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     </AppLayout>
 </template>
