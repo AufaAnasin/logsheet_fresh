@@ -5,8 +5,7 @@ import { Head, useForm } from '@inertiajs/vue3';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { CirclePlus, Check, ChevronsUpDown, Ellipsis, SquarePen, X } from 'lucide-vue-next';
-import PlaceholderPattern from '../components/PlaceholderPattern.vue';
+import { CirclePlus, Check, ChevronsUpDown, Ellipsis, SquarePen, X, Search } from 'lucide-vue-next';
 import {
     Table,
     TableBody,
@@ -55,8 +54,19 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
+import {
+    Combobox,
+    ComboboxAnchor,
+    ComboboxEmpty,
+    ComboboxGroup,
+    ComboboxInput,
+    ComboboxItem,
+    ComboboxItemIndicator,
+    ComboboxList,
+    ComboboxTrigger,
+} from '@/components/ui/combobox';
 import { cn } from '@/lib/utils';
-import { ref, reactive } from 'vue';
+import { ref, reactive, computed, watch } from 'vue';
 
 // Define interfaces
 interface Department {
@@ -73,15 +83,25 @@ interface Area {
     desc: string | null;
 }
 
+interface Component {
+    ComponentID: number;
+    name: string;
+    AreaID: number;
+    area_name?: string; // Added to match backend response
+    desc: string | null;
+}
+
 // Receive props
 const props = defineProps<{
     departments: Department[];
     areas: Area[];
+    components?: Component[];
 }>();
 
 // Reactive collections
 const localDepartments = reactive(props.departments.slice());
 const localAreas = reactive(props.areas.slice());
+const localComponents = reactive(props.components ? props.components.slice() : []);
 
 // Breadcrumbs
 const breadcrumbs: BreadcrumbItem[] = [
@@ -90,6 +110,17 @@ const breadcrumbs: BreadcrumbItem[] = [
         href: '/dashboard',
     },
 ];
+
+// Computed property for selected department name
+const selectedDepartmentName = computed(() => {
+    if (selectedDepartmentID.value) {
+        const department = localDepartments.find(
+            (dep) => dep.DepartmentID.toString() === selectedDepartmentID.value
+        );
+        return department?.name || 'Select department...';
+    }
+    return 'Select department...';
+});
 
 // Form for adding new department
 const createDepartmentForm = useForm({
@@ -336,6 +367,49 @@ const deleteArea = () => {
         },
     });
 };
+
+// Form for adding new component
+const createComponentForm = useForm({
+    name: '',
+    AreaID: '',
+    desc: '',
+});
+
+// Combobox state for component area selection
+const selectedComponentArea = ref<Area | null>(null);
+
+// Sync AreaID with form
+watch(selectedComponentArea, (newArea) => {
+    createComponentForm.AreaID = newArea ? newArea.AreaID.toString() : '';
+    createComponentForm.errors.AreaID = null;
+});
+
+// Handle component form submission
+const submitComponent = () => {
+    if (!createComponentForm.AreaID) {
+        createComponentForm.errors.AreaID = 'Please select an area.';
+        return;
+    }
+    createComponentForm.post('/components', {
+        preserveState: true,
+        onSuccess: (response) => {
+            createComponentForm.reset();
+            selectedComponentArea.value = null;
+            alert('Component created successfully!');
+            const newComponent = response.props.components.find(
+                (comp: Component) => !localComponents.some((c) => c.ComponentID === comp.ComponentID)
+            );
+            if (newComponent) {
+                localComponents.push(newComponent);
+            }
+        },
+        onError: (errors) => {
+            console.error(errors);
+            const errorMessage = errors.name || errors.AreaID || 'Failed to create component. Check the form inputs.';
+            alert(errorMessage);
+        },
+    });
+};
 </script>
 
 <template>
@@ -364,7 +438,7 @@ const deleteArea = () => {
                 </div>
 
                 <!-- Form for adding new area -->
-                <div class="relative aspect-video rounded-xl border border-sidebar-border/2 dark:border-gray-800 p-3">
+                <div class="relative flex flex-col min-h-full rounded-xl border border-gray-200 dark:border-gray-800 p-3">
                     <p><b>Create Area</b></p>
                     <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
                         <Label for="area_name">Area Name</Label>
@@ -376,7 +450,7 @@ const deleteArea = () => {
                         <Popover v-model:open="isAreaComboboxOpen">
                             <PopoverTrigger as-child>
                                 <Button variant="outline" role="combobox" :aria-expanded="isAreaComboboxOpen" class="w-full justify-between">
-                                    {{ selectedDepartmentID ? localDepartments.find((dep) => dep.DepartmentID.toString() === selectedDepartmentID)?.name : 'Select department...' }}
+                                    {{ selectedDepartmentName }}
                                     <ChevronsUpDown class="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                 </Button>
                             </PopoverTrigger>
@@ -408,9 +482,54 @@ const deleteArea = () => {
                     </Button>
                 </div>
 
-                <!-- Placeholder card -->
-                <div class="relative aspect-video overflow-hidden rounded-xl border border-sidebar-border/2 dark:border-gray-800 p-3">
-                    <PlaceholderPattern />
+                <!-- Form for adding new component -->
+                <div class="relative flex flex-col min-h-full rounded-xl border border-gray-200 dark:border-gray-800 p-3">
+                    <p><b>Create Component</b></p>
+                    <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
+                        <Label for="component_name">Component Name</Label>
+                        <Input id="component_name" type="text" placeholder="Put Component name ..." v-model="createComponentForm.name" @input="createComponentForm.errors.name = null" />
+                        <span v-if="createComponentForm.errors.name" class="text-red-500 text-sm">{{ createComponentForm.errors.name }}</span>
+                    </div>
+                    <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
+                        <Label for="component_area">Which Area?</Label>
+                        <Combobox v-model="selectedComponentArea" class="w-full" by="AreaID">
+                            <ComboboxAnchor as-child>
+                                <ComboboxTrigger as-child>
+                                    <Button variant="outline" class="justify-between w-full">
+                                        {{ selectedComponentArea?.name ?? 'Select area...' }}
+                                        <ChevronsUpDown class="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                </ComboboxTrigger>
+                            </ComboboxAnchor>
+                            <ComboboxList>
+                                <div class="relative w-full max-w-sm items-center">
+                                    <ComboboxInput class="focus-visible:ring-0 border-0 border-b rounded-none h-10" placeholder="Search area..." />
+                                    <span class="absolute start-0 inset-y-0 flex items-center justify-center px-3">
+                                        <Search class="size-4 text-muted-foreground" />
+                                    </span>
+                                </div>
+                                <ComboboxEmpty>No area found.</ComboboxEmpty>
+                                <ComboboxGroup>
+                                    <ComboboxItem v-for="area in localAreas" :key="area.AreaID" :value="area">
+                                        {{ area.name }}
+                                        <ComboboxItemIndicator>
+                                            <Check :class="cn('ml-auto h-4 w-4', selectedComponentArea?.AreaID === area.AreaID ? 'opacity-100' : 'opacity-0')" />
+                                        </ComboboxItemIndicator>
+                                    </ComboboxItem>
+                                </ComboboxGroup>
+                            </ComboboxList>
+                        </Combobox>
+                        <span v-if="createComponentForm.errors.AreaID" class="text-red-500 text-sm">{{ createComponentForm.errors.AreaID }}</span>
+                    </div>
+                    <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
+                        <Label for="component_description">Description</Label>
+                        <Input id="component_description" type="text" placeholder="Put Component description ..." v-model="createComponentForm.desc" @input="createComponentForm.errors.desc = null" />
+                        <span v-if="createComponentForm.errors.desc" class="text-red-500 text-sm">{{ createComponentForm.errors.desc }}</span>
+                    </div>
+                    <Button class="mt-3 w-full" @click="submitComponent" :disabled="createComponentForm.processing">
+                        <CirclePlus class="w-4 h-4 mr-2" />
+                        {{ createComponentForm.processing ? 'Submitting...' : 'Create Component' }}
+                    </Button>
                 </div>
             </div>
 
@@ -569,7 +688,7 @@ const deleteArea = () => {
                                 <Popover v-model:open="isAreaComboboxOpen">
                                     <PopoverTrigger as-child>
                                         <Button variant="outline" role="combobox" :aria-expanded="isAreaComboboxOpen" class="w-full justify-between">
-                                            {{ selectedDepartmentID ? localDepartments.find((dep) => dep.DepartmentID.toString() === selectedDepartmentID)?.name : 'Select department...' }}
+                                            {{ selectedDepartmentName }}
                                             <ChevronsUpDown class="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                         </Button>
                                     </PopoverTrigger>
@@ -612,7 +731,7 @@ const deleteArea = () => {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the area "{{ areaToDelete?.name }}" from the database.
+                            This action cannot be undone. This will permanently delete the area "{{ areaToDelete?.name }}" and its associated components from the database.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

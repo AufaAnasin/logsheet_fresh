@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Component extends Model
 {
+    // use HasFactory; // Add this
     protected $primaryKey = 'ComponentID';
 
     protected $fillable = [
