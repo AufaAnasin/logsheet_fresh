@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Area;
 use App\Models\Department;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -17,6 +18,15 @@ class DepartmentController extends Controller
                     'DepartmentID' => $department->DepartmentID,
                     'name' => $department->name,
                     'desc' => $department->desc,
+                ];
+            }),
+            'areas' => Area::with('department')->get()->map(function ($area) {
+                return [
+                    'AreaID' => $area->AreaID,
+                    'name' => $area->name,
+                    'DepartmentID' => $area->DepartmentID,
+                    'department_name' => $area->department ? $area->department->name : 'No Department',
+                    'desc' => $area->desc,
                 ];
             }),
         ]);

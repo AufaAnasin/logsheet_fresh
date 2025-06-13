@@ -9,7 +9,7 @@ Route::get('/', function () {
     return Inertia::render('Welcome');
 })->name('home');
 
-Route::get('/dashboard', [AreaController::class, 'index'])
+Route::get('/dashboard', [DepartmentController::class, 'index'])
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
 
