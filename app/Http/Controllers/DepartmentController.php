@@ -2,17 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Area;
 use App\Models\Department;
+use App\Models\Area;
+use App\Models\Component;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Illuminate\Validation\Rule;
 
 class DepartmentController extends Controller
 {
     public function index()
     {
-        return Inertia::render('Dashboard', [
+        $data = [
             'departments' => Department::all()->map(function ($department) {
                 return [
                     'DepartmentID' => $department->DepartmentID,
@@ -29,69 +29,51 @@ class DepartmentController extends Controller
                     'desc' => $area->desc,
                 ];
             }),
-        ]);
+            'components' => Component::with('area')->get()->map(function ($component) {
+                return [
+                    'ComponentID' => $component->ComponentID,
+                    'name' => $component->name,
+                    'AreaID' => $component->AreaID,
+                    'area_name' => $component->area ? $component->area->name : null,
+                    'desc' => $component->desc,
+                ];
+            }),
+        ];
+        return Inertia::render('Dashboard', $data);
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:departments,name',
+            'name' => 'required|string|max:255',
             'desc' => 'nullable|string',
         ]);
 
         Department::create($validated);
 
-        return redirect()->route('dashboard')->with('success', 'Department created successfully!')
-            ->with([
-                'departments' => Department::all()->map(function ($department) {
-                    return [
-                        'DepartmentID' => $department->DepartmentID,
-                        'name' => $department->name,
-                        'desc' => $department->desc,
-                    ];
-                }),
-            ]);
-    }
-
-    public function destroy(Department $department)
-    {
-        $department->delete();
-
-        return redirect()->route('dashboard')->with('success', 'Department deleted successfully!')
-            ->with([
-                'departments' => Department::all()->map(function ($department) {
-                    return [
-                        'DepartmentID' => $department->DepartmentID,
-                        'name' => $department->name,
-                        'desc' => $department->desc,
-                    ];
-                }),
-            ]);
+        return redirect()->route('dashboard');
     }
 
     public function update(Request $request, Department $department)
     {
         $validated = $request->validate([
-            'name' => [
-                'required',
-                'string',
-                'max:255',
-                Rule::unique('departments', 'name')->ignore($department->DepartmentID, 'DepartmentID'),
-            ],
+            'name' => 'required|string|max:255',
             'desc' => 'nullable|string',
         ]);
 
         $department->update($validated);
 
-        return redirect()->route('dashboard')->with('success', 'Department updated successfully!')
-            ->with([
-                'departments' => Department::all()->map(function ($department) {
-                    return [
-                        'DepartmentID' => $department->DepartmentID,
-                        'name' => $department->name,
-                        'desc' => $department->desc,
-                    ];
-                }),
-            ]);
+        return redirect()->route('dashboard');
+    }
+
+    public function destroy(Department $department)
+    {
+        try {
+            $department->delete();
+        } catch (\Illuminate\Database\QueryException $e) {
+            return redirect()->route('dashboard')->withErrors(['delete' => 'Cannot delete department because it has associated areas.']);
+        }
+
+        return redirect()->route('dashboard');
     }
 }

@@ -23,7 +23,13 @@ Route::post('/areas', [AreaController::class, 'store'])->name('areas.store');
 Route::put('/areas/{area}', [AreaController::class, 'update'])->name('areas.update');
 Route::delete('/areas/{area}', [AreaController::class, 'destroy'])->name('areas.destroy');
 
+Route::get('/components', function () {
+    return redirect()->route('dashboard');
+})->middleware('auth');
+
 Route::post('/components', [ComponentController::class, 'store'])->middleware('auth');
+Route::put('/components/{component}', [ComponentController::class, 'update'])->middleware('auth');
+Route::delete('/components/{component}', [ComponentController::class, 'destroy'])->middleware('auth');
 
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';
