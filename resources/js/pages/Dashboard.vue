@@ -66,7 +66,7 @@ import {
     ComboboxTrigger,
 } from '@/components/ui/combobox';
 import { cn } from '@/lib/utils';
-import { ref, reactive, computed, watch } from 'vue';
+import { ref, reactive, computed, watch, onMounted } from 'vue';
 
 // Define interfaces
 interface Department {
@@ -87,7 +87,7 @@ interface Component {
     ComponentID: number;
     name: string;
     AreaID: number;
-    area_name?: string; // Added to match backend response
+    area_name?: string;
     desc: string | null;
 }
 
@@ -97,6 +97,12 @@ const props = defineProps<{
     areas: Area[];
     components?: Component[];
 }>();
+
+// Log props on mount
+onMounted(() => {
+    console.log('Dashboard mounted. Props components:', props.components);
+    console.log('localComponents initial:', localComponents);
+});
 
 // Reactive collections
 const localDepartments = reactive(props.departments.slice());
@@ -272,7 +278,7 @@ const submitArea = () => {
 // Update DepartmentID when combobox selection changes
 const updateDepartmentID = (departmentID: string) => {
     createAreaForm.DepartmentID = departmentID;
-    editAreaForm.DepartmentID = departmentID; // Sync for edit form
+    editAreaForm.DepartmentID = departmentID;
     createAreaForm.errors.DepartmentID = null;
     editAreaForm.errors.DepartmentID = null;
     selectedDepartmentID.value = departmentID;
@@ -386,6 +392,7 @@ watch(selectedComponentArea, (newArea) => {
 
 // Handle component form submission
 const submitComponent = () => {
+    console.log('Submitting component:', createComponentForm.data());
     if (!createComponentForm.AreaID) {
         createComponentForm.errors.AreaID = 'Please select an area.';
         return;
@@ -393,6 +400,7 @@ const submitComponent = () => {
     createComponentForm.post('/components', {
         preserveState: true,
         onSuccess: (response) => {
+            console.log('Component created response:', response.props.components);
             createComponentForm.reset();
             selectedComponentArea.value = null;
             alert('Component created successfully!');
@@ -401,12 +409,120 @@ const submitComponent = () => {
             );
             if (newComponent) {
                 localComponents.push(newComponent);
+                console.log('New component added to localComponents:', newComponent);
+            } else {
+                console.warn('No new component found in response:', response.props.components);
             }
         },
         onError: (errors) => {
-            console.error(errors);
-            const errorMessage = errors.name || errors.AreaID || 'Failed to create component. Check the form inputs.';
+            console.error('Component errors:', errors);
+            const errorMessage = errors.name || errors.AreaID || errors.create || 'Failed to create component. Check the form inputs.';
             alert(errorMessage);
+        },
+    });
+};
+
+// Edit component dialog state
+const isEditComponentDialogOpen = ref(false);
+const selectedComponent = ref<Component | null>(null);
+
+// Form for editing component
+const editComponentForm = useForm({
+    name: '',
+    AreaID: '',
+    desc: '',
+});
+
+// Combobox state for edit component area selection
+const selectedEditComponentArea = ref<Area | null>(null);
+
+// Sync AreaID with edit form
+watch(selectedEditComponentArea, (newArea) => {
+    editComponentForm.AreaID = newArea ? newArea.AreaID.toString() : '';
+    editComponentForm.errors.AreaID = null;
+});
+
+// Open edit component dialog
+const openEditComponentDialog = (component: Component) => {
+    selectedComponent.value = component;
+    editComponentForm.reset();
+    editComponentForm.clearErrors();
+    editComponentForm.name = component.name;
+    editComponentForm.desc = component.desc || '';
+    editComponentForm.AreaID = component.AreaID.toString();
+    selectedEditComponentArea.value = localAreas.find(
+        (area) => area.AreaID === component.AreaID
+    ) || null;
+    isEditComponentDialogOpen.value = true;
+};
+
+// Handle edit component form submission
+const updateComponent = () => {
+    if (!selectedComponent.value) return;
+    if (!editComponentForm.AreaID) {
+        editComponentForm.errors.AreaID = 'Please select an area.';
+        return;
+    }
+    editComponentForm.put(`/components/${selectedComponent.value.ComponentID}`, {
+        preserveState: true,
+        onSuccess: (response) => {
+            alert('Component updated successfully!');
+            isEditComponentDialogOpen.value = false;
+            const updatedComponent = response.props.components.find(
+                (comp: Component) => comp.ComponentID === selectedComponent.value!.ComponentID
+            );
+            if (updatedComponent) {
+                const index = localComponents.findIndex(
+                    (comp) => comp.ComponentID === updatedComponent.ComponentID
+                );
+                if (index !== -1) {
+                    localComponents[index] = updatedComponent;
+                }
+            }
+            selectedEditComponentArea.value = null;
+        },
+        onError: (errors) => {
+            console.error(errors);
+            const errorMessage = errors.name || errors.AreaID || 'Failed to update component. Check the form inputs.';
+            alert(errorMessage);
+        },
+    });
+};
+
+// Delete component dialog state
+const isDeleteComponentDialogOpen = ref(false);
+const componentToDelete = ref<Component | null>(null);
+
+// Form for deleting component
+const deleteComponentForm = useForm({});
+
+// Open delete component dialog
+const openDeleteComponentDialog = (component: Component) => {
+    componentToDelete.value = component;
+    isDeleteComponentDialogOpen.value = true;
+};
+
+// Handle delete component confirmation
+const deleteComponent = () => {
+    if (!componentToDelete.value) return;
+    deleteComponentForm.delete(`/components/${componentToDelete.value.ComponentID}`, {
+        preserveState: true,
+        onSuccess: () => {
+            alert('Component deleted successfully!');
+            isDeleteComponentDialogOpen.value = false;
+            const index = localComponents.findIndex(
+                (comp) => comp.ComponentID === componentToDelete.value!.ComponentID
+            );
+            if (index !== -1) {
+                localComponents.splice(index, 1);
+            }
+            componentToDelete.value = null;
+        },
+        onError: (errors) => {
+            console.error(errors);
+            const errorMessage = errors.delete || 'Failed to delete component.';
+            alert(errorMessage);
+            isDeleteComponentDialogOpen.value = false;
         },
     });
 };
@@ -619,6 +735,50 @@ const submitComponent = () => {
                 </Table>
             </div>
 
+            <!-- Component table -->
+            <div class="relative flex-1 rounded-xl border border-sidebar-border/2 dark:border-gray-800 p-3">
+                <p><b>List All Components</b></p>
+                <Table>
+                    <TableCaption>A list of components.</TableCaption>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead class="w-[100px]">ID</TableHead>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Area</TableHead>
+                            <TableHead>Description</TableHead>
+                            <TableHead>Action</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        <TableRow v-for="component in localComponents" :key="component.ComponentID">
+                            <TableCell class="font-medium">{{ component.ComponentID }}</TableCell>
+                            <TableCell>{{ component.name }}</TableCell>
+                            <TableCell>{{ component.area_name || 'No area' }}</TableCell>
+                            <TableCell>{{ component.desc || 'No description' }}</TableCell>
+                            <TableCell>
+                                <div class="flex items-center space-x-2">
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger>
+                                            <Ellipsis />
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent>
+                                            <DropdownMenuLabel>Select Action</DropdownMenuLabel>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem @click="openEditComponentDialog(component)">
+                                                <SquarePen class="w-4 h-4 mr-2" />Edit
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem @click="openDeleteComponentDialog(component)">
+                                                <X class="w-4 h-4 mr-2" />Delete
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+                            </TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
+            </div>
+
             <!-- Edit Department Dialog -->
             <Dialog v-model:open="isEditDepartmentDialogOpen">
                 <DialogContent class="sm:max-w-[425px]">
@@ -738,6 +898,87 @@ const submitComponent = () => {
                         <AlertDialogCancel @click="isDeleteAreaDialogOpen = false">Cancel</AlertDialogCancel>
                         <AlertDialogAction @click="deleteArea" :disabled="deleteAreaForm.processing">
                             {{ deleteAreaForm.processing ? 'Deleting...' : 'Delete' }}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <!-- Edit Component Dialog -->
+            <Dialog v-model:open="isEditComponentDialogOpen">
+                <DialogContent class="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Edit Component</DialogTitle>
+                        <DialogDescription>
+                            Make changes to the component details here. Click save when you're done.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div class="grid gap-4 py-4">
+                        <div class="grid grid-cols-4 items-center gap-4">
+                            <Label for="edit_component_name" class="text-right">Name</Label>
+                            <Input id="edit_component_name" v-model="editComponentForm.name" class="col-span-3" @input="editComponentForm.errors.name = null" />
+                            <span v-if="editComponentForm.errors.name" class="text-red-500 text-sm col-start-2 col-span-3">{{ editComponentForm.errors.name }}</span>
+                        </div>
+                        <div class="grid grid-cols-4 items-center gap-4">
+                            <Label for="edit_component_area" class="text-right">Area</Label>
+                            <div class="col-span-3">
+                                <Combobox v-model="selectedEditComponentArea" class="w-full" by="AreaID">
+                                    <ComboboxAnchor as-child>
+                                        <ComboboxTrigger as-child>
+                                            <Button variant="outline" class="justify-between w-full">
+                                                {{ selectedEditComponentArea?.name ?? 'Select area...' }}
+                                                <ChevronsUpDown class="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                            </Button>
+                                        </ComboboxTrigger>
+                                    </ComboboxAnchor>
+                                    <ComboboxList>
+                                        <div class="relative w-full max-w-sm items-center">
+                                            <ComboboxInput class="focus-visible:ring-0 border-0 border-b rounded-none h-10" placeholder="Search area..." />
+                                            <span class="absolute start-0 inset-y-0 flex items-center justify-center px-3">
+                                                <Search class="size-4 text-muted-foreground" />
+                                            </span>
+                                        </div>
+                                        <ComboboxEmpty>No area found.</ComboboxEmpty>
+                                        <ComboboxGroup>
+                                            <ComboboxItem v-for="area in localAreas" :key="area.AreaID" :value="area">
+                                                {{ area.name }}
+                                                <ComboboxItemIndicator>
+                                                    <Check :class="cn('ml-auto h-4 w-4', selectedEditComponentArea?.AreaID === area.AreaID ? 'opacity-100' : 'opacity-0')" />
+                                                </ComboboxItemIndicator>
+                                            </ComboboxItem>
+                                        </ComboboxGroup>
+                                    </ComboboxList>
+                                </Combobox>
+                                <span v-if="editComponentForm.errors.AreaID" class="text-red-500 text-sm">{{ editComponentForm.errors.AreaID }}</span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-4 items-center gap-4">
+                            <Label for="edit_component_desc" class="text-right">Description</Label>
+                            <Input id="edit_component_desc" v-model="editComponentForm.desc" class="col-span-3" @input="editComponentForm.errors.desc = null" />
+                            <span v-if="editComponentForm.errors.desc" class="text-red-500 text-sm col-start-2 col-span-3">{{ editComponentForm.errors.desc }}</span>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" @click="isEditComponentDialogOpen = false">Cancel</Button>
+                        <Button type="submit" @click="updateComponent" :disabled="editComponentForm.processing">
+                            {{ editComponentForm.processing ? 'Saving...' : 'Save Changes' }}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <!-- Delete Component Alert Dialog -->
+            <AlertDialog v-model:open="isDeleteComponentDialogOpen">
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the component "{{ componentToDelete?.name }}" and any associated log data from the database.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel @click="isDeleteComponentDialogOpen = false">Cancel</AlertDialogCancel>
+                        <AlertDialogAction @click="deleteComponent" :disabled="deleteComponentForm.processing">
+                            {{ deleteComponentForm.processing ? 'Deleting...' : 'Delete' }}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
