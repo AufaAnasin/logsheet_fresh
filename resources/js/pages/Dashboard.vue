@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
-import { type BreadcrumbItem } from '@/types';
-import { Head, useForm } from '@inertiajs/vue3';
+// import { type Breadcrumb } from '@/types';
+import { Head, useForm, usePage } from '@inertiajs/vue3';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -66,7 +66,7 @@ import {
     ComboboxTrigger,
 } from '@/components/ui/combobox';
 import { cn } from '@/lib/utils';
-import { ref, reactive, computed, watch, onMounted } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 
 // Define interfaces
 interface Department {
@@ -87,40 +87,67 @@ interface Component {
     ComponentID: number;
     name: string;
     AreaID: number;
-    area_name?: string;
+    area_name: string | null;
     desc: string | null;
 }
 
-// Receive props
+interface Flash {
+    success?: string | null;
+    error?: string | null;
+}
+
+interface PageProps {
+    flash?: Flash;
+    errors?: Record<string, string>;
+    departments?: Department[] | null;
+    areas?: Area[] | null;
+    components?: Component[] | null;
+}
+
+// Props with nullable arrays
 const props = defineProps<{
-    departments: Department[];
-    areas: Area[];
-    components?: Component[];
+    departments: Department[] | null;
+    areas: Area[] | null;
+    components: Component[] | null;
 }>();
 
-// Log props on mount
+// Loading state
+const isLoading = ref(true);
+
+// Debug props
 onMounted(() => {
-    console.log('Dashboard mounted. Props components:', props.components);
-    console.log('localComponents initial:', localComponents);
+    console.log('Dashboard mounted. Props:', {
+        departments: props.departments,
+        areas: props.areas,
+        components: props.components,
+    });
+    isLoading.value = false;
 });
 
-// Reactive collections
-const localDepartments = reactive(props.departments.slice());
-const localAreas = reactive(props.areas.slice());
-const localComponents = reactive(props.components ? props.components.slice() : []);
+// Safe arrays
+const safeDepartments = computed(() => Array.isArray(props.departments) ? props.departments : []);
+const safeAreas = computed(() => Array.isArray(props.areas) ? props.areas : []);
+const safeComponents = computed(() => Array.isArray(props.components) ? props.components : []);
+
+// Flash messages
+const page = usePage<{ props: PageProps }>();
+const flash = computed(() => {
+    const flashObj: Flash = page.props.flash ?? { success: null, error: null };
+    return {
+        success: flashObj.success ?? null,
+        error: page.props.errors ? Object.values(page.props.errors).join(', ') ?? null : flashObj.error ?? null,
+    };
+});
 
 // Breadcrumbs
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Dashboard',
-        href: '/dashboard',
-    },
+const breadcrumbs = [
+    { title: 'Dashboard', href: '/dashboard' },
 ];
 
 // Computed property for selected department name
 const selectedDepartmentName = computed(() => {
     if (selectedDepartmentID.value) {
-        const department = localDepartments.find(
+        const department = safeDepartments.value.find(
             (dep) => dep.DepartmentID.toString() === selectedDepartmentID.value
         );
         return department?.name || 'Select department...';
@@ -128,31 +155,22 @@ const selectedDepartmentName = computed(() => {
     return 'Select department...';
 });
 
+// Utility to convert null to undefined
+const nullToUndefined = (value: string | null): string | undefined => value ?? undefined;
+
 // Form for adding new department
 const createDepartmentForm = useForm({
     name: '',
-    desc: '',
+    desc: undefined as string | undefined,
 });
 
 // Handle create department form submission
 const submitDepartment = () => {
     createDepartmentForm.post('/departments', {
         preserveState: true,
-        onSuccess: (response) => {
-            createDepartmentForm.reset();
-            alert('Department created successfully!');
-            const newDepartment = response.props.departments.find(
-                (dep: Department) => !localDepartments.some((d) => d.DepartmentID === dep.DepartmentID)
-            );
-            if (newDepartment) {
-                localDepartments.push(newDepartment);
-            }
-        },
-        onError: (errors) => {
-            console.error(errors);
-            const errorMessage = errors.name || 'Failed to create department. Check the form inputs.';
-            alert(errorMessage);
-        },
+        preserveScroll: true,
+        onSuccess: () => createDepartmentForm.reset(),
+        onError: () => {},
     });
 };
 
@@ -163,16 +181,16 @@ const selectedDepartment = ref<Department | null>(null);
 // Form for editing department
 const editDepartmentForm = useForm({
     name: '',
-    desc: '',
+    desc: undefined as string | undefined,
 });
 
 // Open edit department dialog
 const openEditDepartmentDialog = (department: Department) => {
-    selectedDepartment.value = department;
+    selectedDepartment.value = { ...department };
     editDepartmentForm.reset();
     editDepartmentForm.clearErrors();
     editDepartmentForm.name = department.name;
-    editDepartmentForm.desc = department.desc || '';
+    editDepartmentForm.desc = nullToUndefined(department.desc);
     isEditDepartmentDialogOpen.value = true;
 };
 
@@ -181,26 +199,11 @@ const updateDepartment = () => {
     if (!selectedDepartment.value) return;
     editDepartmentForm.put(`/departments/${selectedDepartment.value.DepartmentID}`, {
         preserveState: true,
-        onSuccess: (response) => {
-            alert('Department updated successfully!');
+        preserveScroll: true,
+        onSuccess: () => {
             isEditDepartmentDialogOpen.value = false;
-            const updatedDepartment = response.props.departments.find(
-                (dep: Department) => dep.DepartmentID === selectedDepartment.value!.DepartmentID
-            );
-            if (updatedDepartment) {
-                const index = localDepartments.findIndex(
-                    (dep) => dep.DepartmentID === updatedDepartment.DepartmentID
-                );
-                if (index !== -1) {
-                    localDepartments[index] = updatedDepartment;
-                }
-            }
         },
-        onError: (errors) => {
-            console.error(errors);
-            const errorMessage = errors.name || 'Failed to update department. Check the form inputs.';
-            alert(errorMessage);
-        },
+        onError: () => {},
     });
 };
 
@@ -213,7 +216,7 @@ const deleteDepartmentForm = useForm({});
 
 // Open delete department dialog
 const openDeleteDepartmentDialog = (department: Department) => {
-    departmentToDelete.value = department;
+    departmentToDelete.value = { ...department };
     isDeleteDepartmentDialogOpen.value = true;
 };
 
@@ -222,65 +225,50 @@ const deleteDepartment = () => {
     if (!departmentToDelete.value) return;
     deleteDepartmentForm.delete(`/departments/${departmentToDelete.value.DepartmentID}`, {
         preserveState: true,
+        preserveScroll: true,
         onSuccess: () => {
-            alert('Department deleted successfully!');
             isDeleteDepartmentDialogOpen.value = false;
-            const index = localDepartments.findIndex(
-                (dep) => dep.DepartmentID === departmentToDelete.value!.DepartmentID
-            );
-            if (index !== -1) {
-                localDepartments.splice(index, 1);
-            }
             departmentToDelete.value = null;
         },
-        onError: (errors) => {
-            console.error(errors);
-            alert('Failed to delete department.');
-            isDeleteDepartmentDialogOpen.value = false;
-        },
+        onError: () => {},
     });
 };
 
 // Form for adding new area
 const createAreaForm = useForm({
     name: '',
-    DepartmentID: '',
-    desc: '',
+    DepartmentID: undefined as number | undefined,
+    desc: undefined as string | undefined,
 });
 
 // Combobox state for area department selection
 const isAreaComboboxOpen = ref(false);
-const selectedDepartmentID = ref('');
+const selectedDepartmentID = ref<string | null>(null);
 
 // Handle area form submission
 const submitArea = () => {
+    if (!createAreaForm.DepartmentID) {
+        createAreaForm.errors.DepartmentID = 'Please select a department.';
+        return;
+    }
     createAreaForm.post('/areas', {
         preserveState: true,
-        onSuccess: (response) => {
+        preserveScroll: true,
+        onSuccess: () => {
             createAreaForm.reset();
-            selectedDepartmentID.value = '';
-            alert('Area created successfully!');
-            const newArea = response.props.areas.find(
-                (area: Area) => !localAreas.some((a) => a.AreaID === area.AreaID)
-            );
-            if (newArea) {
-                localAreas.push(newArea);
-            }
+            selectedDepartmentID.value = null;
         },
-        onError: (errors) => {
-            console.error(errors);
-            const errorMessage = errors.name || errors.DepartmentID || 'Failed to create area. Check the form inputs.';
-            alert(errorMessage);
-        },
+        onError: () => {},
     });
 };
 
 // Update DepartmentID when combobox selection changes
 const updateDepartmentID = (departmentID: string) => {
-    createAreaForm.DepartmentID = departmentID;
-    editAreaForm.DepartmentID = departmentID;
-    createAreaForm.errors.DepartmentID = null;
-    editAreaForm.errors.DepartmentID = null;
+    const id = parseInt(departmentID);
+    createAreaForm.DepartmentID = id;
+    editAreaForm.DepartmentID = id;
+    createAreaForm.errors.DepartmentID = undefined;
+    editAreaForm.errors.DepartmentID = undefined;
     selectedDepartmentID.value = departmentID;
     isAreaComboboxOpen.value = false;
 };
@@ -292,48 +280,33 @@ const selectedArea = ref<Area | null>(null);
 // Form for editing area
 const editAreaForm = useForm({
     name: '',
-    DepartmentID: '',
-    desc: '',
+    DepartmentID: undefined as number | undefined,
+    desc: undefined as string | undefined,
 });
 
 // Open edit area dialog
 const openEditAreaDialog = (area: Area) => {
-    selectedArea.value = area;
+    selectedArea.value = { ...area };
     editAreaForm.reset();
     editAreaForm.clearErrors();
     editAreaForm.name = area.name;
-    editAreaForm.DepartmentID = area.DepartmentID.toString();
-    editAreaForm.desc = area.desc || '';
+    editAreaForm.DepartmentID = area.DepartmentID;
+    editAreaForm.desc = nullToUndefined(area.desc);
     selectedDepartmentID.value = area.DepartmentID.toString();
     isEditAreaDialogOpen.value = true;
 };
 
 // Handle edit area form submission
 const updateArea = () => {
-    if (!selectedArea.value) return;
+    if (!selectedArea.value || !editAreaForm.DepartmentID) return;
     editAreaForm.put(`/areas/${selectedArea.value.AreaID}`, {
         preserveState: true,
-        onSuccess: (response) => {
-            alert('Area updated successfully!');
+        preserveScroll: true,
+        onSuccess: () => {
             isEditAreaDialogOpen.value = false;
-            const updatedArea = response.props.areas.find(
-                (area: Area) => area.AreaID === selectedArea.value!.AreaID
-            );
-            if (updatedArea) {
-                const index = localAreas.findIndex(
-                    (area) => area.AreaID === updatedArea.AreaID
-                );
-                if (index !== -1) {
-                    localAreas[index] = updatedArea;
-                }
-            }
-            selectedDepartmentID.value = '';
+            selectedDepartmentID.value = null;
         },
-        onError: (errors) => {
-            console.error(errors);
-            const errorMessage = errors.name || errors.DepartmentID || 'Failed to update area. Check the form inputs.';
-            alert(errorMessage);
-        },
+        onError: () => {},
     });
 };
 
@@ -346,7 +319,7 @@ const deleteAreaForm = useForm({});
 
 // Open delete area dialog
 const openDeleteAreaDialog = (area: Area) => {
-    areaToDelete.value = area;
+    areaToDelete.value = { ...area };
     isDeleteAreaDialogOpen.value = true;
 };
 
@@ -355,30 +328,20 @@ const deleteArea = () => {
     if (!areaToDelete.value) return;
     deleteAreaForm.delete(`/areas/${areaToDelete.value.AreaID}`, {
         preserveState: true,
+        preserveScroll: true,
         onSuccess: () => {
-            alert('Area deleted successfully!');
             isDeleteAreaDialogOpen.value = false;
-            const index = localAreas.findIndex(
-                (area) => area.AreaID === areaToDelete.value!.AreaID
-            );
-            if (index !== -1) {
-                localAreas.splice(index, 1);
-            }
             areaToDelete.value = null;
         },
-        onError: (errors) => {
-            console.error(errors);
-            alert('Failed to delete area.');
-            isDeleteAreaDialogOpen.value = false;
-        },
+        onError: () => {},
     });
 };
 
 // Form for adding new component
 const createComponentForm = useForm({
     name: '',
-    AreaID: '',
-    desc: '',
+    AreaID: undefined as number | undefined,
+    desc: undefined as string | undefined,
 });
 
 // Combobox state for component area selection
@@ -386,39 +349,24 @@ const selectedComponentArea = ref<Area | null>(null);
 
 // Sync AreaID with form
 watch(selectedComponentArea, (newArea) => {
-    createComponentForm.AreaID = newArea ? newArea.AreaID.toString() : '';
-    createComponentForm.errors.AreaID = null;
+    createComponentForm.AreaID = newArea ? newArea.AreaID : undefined;
+    createComponentForm.errors.AreaID = undefined;
 });
 
 // Handle component form submission
 const submitComponent = () => {
-    console.log('Submitting component:', createComponentForm.data());
     if (!createComponentForm.AreaID) {
         createComponentForm.errors.AreaID = 'Please select an area.';
         return;
     }
     createComponentForm.post('/components', {
         preserveState: true,
-        onSuccess: (response) => {
-            console.log('Component created response:', response.props.components);
+        preserveScroll: true,
+        onSuccess: () => {
             createComponentForm.reset();
             selectedComponentArea.value = null;
-            alert('Component created successfully!');
-            const newComponent = response.props.components.find(
-                (comp: Component) => !localComponents.some((c) => c.ComponentID === comp.ComponentID)
-            );
-            if (newComponent) {
-                localComponents.push(newComponent);
-                console.log('New component added to localComponents:', newComponent);
-            } else {
-                console.warn('No new component found in response:', response.props.components);
-            }
         },
-        onError: (errors) => {
-            console.error('Component errors:', errors);
-            const errorMessage = errors.name || errors.AreaID || errors.create || 'Failed to create component. Check the form inputs.';
-            alert(errorMessage);
-        },
+        onError: () => {},
     });
 };
 
@@ -429,8 +377,8 @@ const selectedComponent = ref<Component | null>(null);
 // Form for editing component
 const editComponentForm = useForm({
     name: '',
-    AreaID: '',
-    desc: '',
+    AreaID: undefined as number | undefined,
+    desc: undefined as string | undefined,
 });
 
 // Combobox state for edit component area selection
@@ -438,19 +386,19 @@ const selectedEditComponentArea = ref<Area | null>(null);
 
 // Sync AreaID with edit form
 watch(selectedEditComponentArea, (newArea) => {
-    editComponentForm.AreaID = newArea ? newArea.AreaID.toString() : '';
-    editComponentForm.errors.AreaID = null;
+    editComponentForm.AreaID = newArea ? newArea.AreaID : undefined;
+    editComponentForm.errors.AreaID = undefined;
 });
 
 // Open edit component dialog
 const openEditComponentDialog = (component: Component) => {
-    selectedComponent.value = component;
+    selectedComponent.value = { ...component };
     editComponentForm.reset();
     editComponentForm.clearErrors();
     editComponentForm.name = component.name;
-    editComponentForm.desc = component.desc || '';
-    editComponentForm.AreaID = component.AreaID.toString();
-    selectedEditComponentArea.value = localAreas.find(
+    editComponentForm.desc = nullToUndefined(component.desc);
+    editComponentForm.AreaID = component.AreaID;
+    selectedEditComponentArea.value = safeAreas.value.find(
         (area) => area.AreaID === component.AreaID
     ) || null;
     isEditComponentDialogOpen.value = true;
@@ -458,34 +406,15 @@ const openEditComponentDialog = (component: Component) => {
 
 // Handle edit component form submission
 const updateComponent = () => {
-    if (!selectedComponent.value) return;
-    if (!editComponentForm.AreaID) {
-        editComponentForm.errors.AreaID = 'Please select an area.';
-        return;
-    }
+    if (!selectedComponent.value || !editComponentForm.AreaID) return;
     editComponentForm.put(`/components/${selectedComponent.value.ComponentID}`, {
         preserveState: true,
-        onSuccess: (response) => {
-            alert('Component updated successfully!');
+        preserveScroll: true,
+        onSuccess: () => {
             isEditComponentDialogOpen.value = false;
-            const updatedComponent = response.props.components.find(
-                (comp: Component) => comp.ComponentID === selectedComponent.value!.ComponentID
-            );
-            if (updatedComponent) {
-                const index = localComponents.findIndex(
-                    (comp) => comp.ComponentID === updatedComponent.ComponentID
-                );
-                if (index !== -1) {
-                    localComponents[index] = updatedComponent;
-                }
-            }
             selectedEditComponentArea.value = null;
         },
-        onError: (errors) => {
-            console.error(errors);
-            const errorMessage = errors.name || errors.AreaID || 'Failed to update component. Check the form inputs.';
-            alert(errorMessage);
-        },
+        onError: () => {},
     });
 };
 
@@ -498,7 +427,7 @@ const deleteComponentForm = useForm({});
 
 // Open delete component dialog
 const openDeleteComponentDialog = (component: Component) => {
-    componentToDelete.value = component;
+    componentToDelete.value = { ...component };
     isDeleteComponentDialogOpen.value = true;
 };
 
@@ -507,23 +436,12 @@ const deleteComponent = () => {
     if (!componentToDelete.value) return;
     deleteComponentForm.delete(`/components/${componentToDelete.value.ComponentID}`, {
         preserveState: true,
+        preserveScroll: true,
         onSuccess: () => {
-            alert('Component deleted successfully!');
             isDeleteComponentDialogOpen.value = false;
-            const index = localComponents.findIndex(
-                (comp) => comp.ComponentID === componentToDelete.value!.ComponentID
-            );
-            if (index !== -1) {
-                localComponents.splice(index, 1);
-            }
             componentToDelete.value = null;
         },
-        onError: (errors) => {
-            console.error(errors);
-            const errorMessage = errors.delete || 'Failed to delete component.';
-            alert(errorMessage);
-            isDeleteComponentDialogOpen.value = false;
-        },
+        onError: () => {},
     });
 };
 </script>
@@ -532,19 +450,30 @@ const deleteComponent = () => {
     <Head title="Dashboard" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
+        <div v-if="isLoading" class="flex h-full items-center justify-center">
+            <p>Loading...</p>
+        </div>
+        <div v-else class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
+            <!-- Flash Messages -->
+            <div v-if="flash.success" class="rounded-xl border border-green-200 bg-green-50 p-3 text-green-700">
+                {{ flash.success }}
+            </div>
+            <div v-if="flash.error" class="rounded-xl border border-red-200 bg-red-50 p-3 text-red-700">
+                {{ flash.error }}
+            </div>
+
             <div class="grid auto-rows-min gap-4 md:grid-cols-3">
                 <!-- Form for adding new department -->
                 <div class="relative flex flex-col min-h-full rounded-xl border border-gray-200 dark:border-gray-800 p-3">
                     <p><b>Add Department</b></p>
                     <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
                         <Label for="department_name">Name</Label>
-                        <Input id="department_name" type="text" placeholder="Put Department name ..." v-model="createDepartmentForm.name" @input="createDepartmentForm.errors.name = null" />
+                        <Input id="department_name" type="text" placeholder="Put Department name ..." v-model="createDepartmentForm.name" @input="createDepartmentForm.errors.name = undefined" />
                         <span v-if="createDepartmentForm.errors.name" class="text-red-500 text-sm">{{ createDepartmentForm.errors.name }}</span>
                     </div>
                     <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
                         <Label for="department_description">Description</Label>
-                        <Input id="department_description" type="text" placeholder="Input Department description ..." v-model="createDepartmentForm.desc" @input="createDepartmentForm.errors.desc = null" />
+                        <Input id="department_description" type="text" placeholder="Input Department description ..." v-model="createDepartmentForm.desc" @input="createDepartmentForm.errors.desc = undefined" />
                         <span v-if="createDepartmentForm.errors.desc" class="text-red-500 text-sm">{{ createDepartmentForm.errors.desc }}</span>
                     </div>
                     <Button class="mt-auto w-full" @click="submitDepartment" :disabled="createDepartmentForm.processing">
@@ -558,7 +487,7 @@ const deleteComponent = () => {
                     <p><b>Create Area</b></p>
                     <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
                         <Label for="area_name">Area Name</Label>
-                        <Input id="area_name" type="text" placeholder="Input Area name ..." v-model="createAreaForm.name" @input="createAreaForm.errors.name = null" />
+                        <Input id="area_name" type="text" placeholder="Input Area name ..." v-model="createAreaForm.name" @input="createAreaForm.errors.name = undefined" />
                         <span v-if="createAreaForm.errors.name" class="text-red-500 text-sm">{{ createAreaForm.errors.name }}</span>
                     </div>
                     <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
@@ -576,7 +505,7 @@ const deleteComponent = () => {
                                     <CommandEmpty>No department found.</CommandEmpty>
                                     <CommandList>
                                         <CommandGroup>
-                                            <CommandItem v-for="department in localDepartments" :key="department.DepartmentID" :value="department.DepartmentID.toString()" @select="updateDepartmentID(department.DepartmentID.toString())">
+                                            <CommandItem v-for="department in safeDepartments" :key="department.DepartmentID" :value="department.DepartmentID.toString()" @select="updateDepartmentID(department.DepartmentID.toString())">
                                                 <Check :class="cn('mr-2 h-4 w-4', selectedDepartmentID === department.DepartmentID.toString() ? 'opacity-100' : 'opacity-0')" />
                                                 {{ department.name }}
                                             </CommandItem>
@@ -589,7 +518,7 @@ const deleteComponent = () => {
                     </div>
                     <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
                         <Label for="area_description">Description</Label>
-                        <Input id="area_description" type="text" placeholder="Input Area description ..." v-model="createAreaForm.desc" @input="createAreaForm.errors.desc = null" />
+                        <Input id="area_description" type="text" placeholder="Input Area description ..." v-model="createAreaForm.desc" @input="createAreaForm.errors.desc = undefined" />
                         <span v-if="createAreaForm.errors.desc" class="text-red-500 text-sm">{{ createAreaForm.errors.desc }}</span>
                     </div>
                     <Button class="mt-3 w-full" @click="submitArea" :disabled="createAreaForm.processing">
@@ -603,7 +532,7 @@ const deleteComponent = () => {
                     <p><b>Create Component</b></p>
                     <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
                         <Label for="component_name">Component Name</Label>
-                        <Input id="component_name" type="text" placeholder="Put Component name ..." v-model="createComponentForm.name" @input="createComponentForm.errors.name = null" />
+                        <Input id="component_name" type="text" placeholder="Put Component name ..." v-model="createComponentForm.name" @input="createComponentForm.errors.name = undefined" />
                         <span v-if="createComponentForm.errors.name" class="text-red-500 text-sm">{{ createComponentForm.errors.name }}</span>
                     </div>
                     <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
@@ -626,7 +555,7 @@ const deleteComponent = () => {
                                 </div>
                                 <ComboboxEmpty>No area found.</ComboboxEmpty>
                                 <ComboboxGroup>
-                                    <ComboboxItem v-for="area in localAreas" :key="area.AreaID" :value="area">
+                                    <ComboboxItem v-for="area in safeAreas" :key="area.AreaID" :value="area">
                                         {{ area.name }}
                                         <ComboboxItemIndicator>
                                             <Check :class="cn('ml-auto h-4 w-4', selectedComponentArea?.AreaID === area.AreaID ? 'opacity-100' : 'opacity-0')" />
@@ -639,7 +568,7 @@ const deleteComponent = () => {
                     </div>
                     <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
                         <Label for="component_description">Description</Label>
-                        <Input id="component_description" type="text" placeholder="Put Component description ..." v-model="createComponentForm.desc" @input="createComponentForm.errors.desc = null" />
+                        <Input id="component_description" type="text" placeholder="Put Component description ..." v-model="createComponentForm.desc" @input="createComponentForm.errors.desc = undefined" />
                         <span v-if="createComponentForm.errors.desc" class="text-red-500 text-sm">{{ createComponentForm.errors.desc }}</span>
                     </div>
                     <Button class="mt-3 w-full" @click="submitComponent" :disabled="createComponentForm.processing">
@@ -663,7 +592,10 @@ const deleteComponent = () => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        <TableRow v-for="department in localDepartments" :key="department.DepartmentID">
+                        <TableRow v-if="safeDepartments.length === 0">
+                            <TableCell colspan="4" class="text-center">No departments available.</TableCell>
+                        </TableRow>
+                        <TableRow v-else v-for="department in safeDepartments" :key="department.DepartmentID">
                             <TableCell class="font-medium">{{ department.DepartmentID }}</TableCell>
                             <TableCell>{{ department.name }}</TableCell>
                             <TableCell>{{ department.desc || 'No description' }}</TableCell>
@@ -706,7 +638,10 @@ const deleteComponent = () => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        <TableRow v-for="area in localAreas" :key="area.AreaID">
+                        <TableRow v-if="safeAreas.length === 0">
+                            <TableCell colspan="5" class="text-center">No areas available.</TableCell>
+                        </TableRow>
+                        <TableRow v-else v-for="area in safeAreas" :key="area.AreaID">
                             <TableCell class="font-medium">{{ area.AreaID }}</TableCell>
                             <TableCell>{{ area.name }}</TableCell>
                             <TableCell>{{ area.department_name }}</TableCell>
@@ -750,7 +685,10 @@ const deleteComponent = () => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        <TableRow v-for="component in localComponents" :key="component.ComponentID">
+                        <TableRow v-if="safeComponents.length === 0">
+                            <TableCell colspan="5" class="text-center">No components available.</TableCell>
+                        </TableRow>
+                        <TableRow v-else v-for="component in safeComponents" :key="component.ComponentID">
                             <TableCell class="font-medium">{{ component.ComponentID }}</TableCell>
                             <TableCell>{{ component.name }}</TableCell>
                             <TableCell>{{ component.area_name || 'No area' }}</TableCell>
@@ -791,12 +729,12 @@ const deleteComponent = () => {
                     <div class="grid gap-4 py-4">
                         <div class="grid grid-cols-4 items-center gap-4">
                             <Label for="edit_department_name" class="text-right">Name</Label>
-                            <Input id="edit_department_name" v-model="editDepartmentForm.name" class="col-span-3" @input="editDepartmentForm.errors.name = null" />
+                            <Input id="edit_department_name" type="text" v-model="editDepartmentForm.name" class="col-span-3" @input="editDepartmentForm.errors.name = undefined" />
                             <span v-if="editDepartmentForm.errors.name" class="text-red-500 text-sm col-start-2 col-span-3">{{ editDepartmentForm.errors.name }}</span>
                         </div>
                         <div class="grid grid-cols-4 items-center gap-4">
                             <Label for="edit_department_desc" class="text-right">Description</Label>
-                            <Input id="edit_department_desc" v-model="editDepartmentForm.desc" class="col-span-3" @input="editDepartmentForm.errors.desc = null" />
+                            <Input id="edit_department_desc" type="text" v-model="editDepartmentForm.desc" class="col-span-3" @input="editDepartmentForm.errors.desc = undefined" />
                             <span v-if="editDepartmentForm.errors.desc" class="text-red-500 text-sm col-start-2 col-span-3">{{ editDepartmentForm.errors.desc }}</span>
                         </div>
                     </div>
@@ -815,7 +753,7 @@ const deleteComponent = () => {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the department "{{ departmentToDelete?.name }}" from the database.
+                            This action cannot be undone. This will permanently delete the department "{{ departmentToDelete?.name }}" from the database, if no areas are associated.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -839,7 +777,7 @@ const deleteComponent = () => {
                     <div class="grid gap-4 py-4">
                         <div class="grid grid-cols-4 items-center gap-4">
                             <Label for="edit_area_name" class="text-right">Name</Label>
-                            <Input id="edit_area_name" v-model="editAreaForm.name" class="col-span-3" @input="editAreaForm.errors.name = null" />
+                            <Input id="edit_area_name" type="text" v-model="editAreaForm.name" class="col-span-3" @input="editAreaForm.errors.name = undefined" />
                             <span v-if="editAreaForm.errors.name" class="text-red-500 text-sm col-start-2 col-span-3">{{ editAreaForm.errors.name }}</span>
                         </div>
                         <div class="grid grid-cols-4 items-center gap-4">
@@ -858,7 +796,7 @@ const deleteComponent = () => {
                                             <CommandEmpty>No department found.</CommandEmpty>
                                             <CommandList>
                                                 <CommandGroup>
-                                                    <CommandItem v-for="department in localDepartments" :key="department.DepartmentID" :value="department.DepartmentID.toString()" @select="updateDepartmentID(department.DepartmentID.toString())">
+                                                    <CommandItem v-for="department in safeDepartments" :key="department.DepartmentID" :value="department.DepartmentID.toString()" @select="updateDepartmentID(department.DepartmentID.toString())">
                                                         <Check :class="cn('mr-2 h-4 w-4', selectedDepartmentID === department.DepartmentID.toString() ? 'opacity-100' : 'opacity-0')" />
                                                         {{ department.name }}
                                                     </CommandItem>
@@ -872,7 +810,7 @@ const deleteComponent = () => {
                         </div>
                         <div class="grid grid-cols-4 items-center gap-4">
                             <Label for="edit_area_desc" class="text-right">Description</Label>
-                            <Input id="edit_area_desc" v-model="editAreaForm.desc" class="col-span-3" @input="editAreaForm.errors.desc = null" />
+                            <Input id="edit_area_desc" type="text" v-model="editAreaForm.desc" class="col-span-3" @input="editAreaForm.errors.desc = undefined" />
                             <span v-if="editAreaForm.errors.desc" class="text-red-500 text-sm col-start-2 col-span-3">{{ editAreaForm.errors.desc }}</span>
                         </div>
                     </div>
@@ -891,7 +829,7 @@ const deleteComponent = () => {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the area "{{ areaToDelete?.name }}" and its associated components from the database.
+                            This action cannot be undone. This will permanently delete the area "{{ areaToDelete?.name }}" from the database, if no components have log data.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -915,7 +853,7 @@ const deleteComponent = () => {
                     <div class="grid gap-4 py-4">
                         <div class="grid grid-cols-4 items-center gap-4">
                             <Label for="edit_component_name" class="text-right">Name</Label>
-                            <Input id="edit_component_name" v-model="editComponentForm.name" class="col-span-3" @input="editComponentForm.errors.name = null" />
+                            <Input id="edit_component_name" type="text" v-model="editComponentForm.name" class="col-span-3" @input="editComponentForm.errors.name = undefined" />
                             <span v-if="editComponentForm.errors.name" class="text-red-500 text-sm col-start-2 col-span-3">{{ editComponentForm.errors.name }}</span>
                         </div>
                         <div class="grid grid-cols-4 items-center gap-4">
@@ -939,7 +877,7 @@ const deleteComponent = () => {
                                         </div>
                                         <ComboboxEmpty>No area found.</ComboboxEmpty>
                                         <ComboboxGroup>
-                                            <ComboboxItem v-for="area in localAreas" :key="area.AreaID" :value="area">
+                                            <ComboboxItem v-for="area in safeAreas" :key="area.AreaID" :value="area">
                                                 {{ area.name }}
                                                 <ComboboxItemIndicator>
                                                     <Check :class="cn('ml-auto h-4 w-4', selectedEditComponentArea?.AreaID === area.AreaID ? 'opacity-100' : 'opacity-0')" />
@@ -953,7 +891,7 @@ const deleteComponent = () => {
                         </div>
                         <div class="grid grid-cols-4 items-center gap-4">
                             <Label for="edit_component_desc" class="text-right">Description</Label>
-                            <Input id="edit_component_desc" v-model="editComponentForm.desc" class="col-span-3" @input="editComponentForm.errors.desc = null" />
+                            <Input id="edit_component_desc" type="text" v-model="editComponentForm.desc" class="col-span-3" @input="editComponentForm.errors.desc = undefined" />
                             <span v-if="editComponentForm.errors.desc" class="text-red-500 text-sm col-start-2 col-span-3">{{ editComponentForm.errors.desc }}</span>
                         </div>
                     </div>
@@ -972,7 +910,7 @@ const deleteComponent = () => {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the component "{{ componentToDelete?.name }}" and any associated log data from the database.
+                            This action cannot be undone. This will permanently delete the component "{{ componentToDelete?.name }}" from the database, if no log data is associated.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
