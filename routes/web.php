@@ -3,6 +3,9 @@
 use App\Http\Controllers\AreaController;
 use App\Http\Controllers\ComponentController;
 use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\LogdataController;
+
+
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -30,6 +33,8 @@ Route::get('/components', function () {
 Route::post('/components', [ComponentController::class, 'store'])->middleware('auth');
 Route::put('/components/{component}', [ComponentController::class, 'update'])->middleware('auth');
 Route::delete('/components/{component}', [ComponentController::class, 'destroy'])->middleware('auth');
+
+Route::get('/logdata', [LogdataController::class, 'logData'])->name('logdata');
 
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';
