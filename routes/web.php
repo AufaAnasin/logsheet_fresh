@@ -4,11 +4,8 @@ use App\Http\Controllers\AreaController;
 use App\Http\Controllers\ComponentController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\LogdataController;
-
-
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
-
 
 Route::get('/', function () {
     return Inertia::render('Welcome');
@@ -34,7 +31,8 @@ Route::post('/components', [ComponentController::class, 'store'])->middleware('a
 Route::put('/components/{component}', [ComponentController::class, 'update'])->middleware('auth');
 Route::delete('/components/{component}', [ComponentController::class, 'destroy'])->middleware('auth');
 
-Route::get('/logdata', [LogdataController::class, 'logData'])->name('logdata');
+Route::get('/logdata', [ComponentController::class, 'logData'])->name('logdata');
+Route::post('/logdata/store', [ComponentController::class, 'storeLog'])->name('logdata.store'); // Add this line
 
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';
