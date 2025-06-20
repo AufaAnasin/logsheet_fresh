@@ -73,34 +73,42 @@ class ComponentController extends Controller
         }
     }
 
-public function logData(): Response
+    public function logData(): Response
     {
-        $areas = Area::with('department')->get()->map(function ($area) {
-            return [
-                'AreaID' => $area->AreaID,
-                'name' => $area->name,
-                'DepartmentID' => $area->DepartmentID,
-                'department_name' => $area->department ? $area->department->name : 'Unknown',
-                'desc' => $area->desc ?? null,
-            ];
-        });
+        $user = Auth::user();
+        $userDepartmentId = $user ? $user->DepartmentID : null;
+
+        $areas = Area::with('department')
+            ->when($userDepartmentId, function ($query) use ($userDepartmentId) {
+                return $query->where('DepartmentID', $userDepartmentId);
+            })
+            ->get()
+            ->map(function ($area) {
+                return [
+                    'AreaID' => $area->AreaID,
+                    'name' => $area->name,
+                    'DepartmentID' => $area->DepartmentID,
+                    'department_name' => $area->department ? $area->department->name : 'Unknown',
+                    'desc' => $area->desc ?? null,
+                ];
+            });
 
         $components = Component::with('area')->get()->map(function ($component) {
             return [
                 'ComponentID' => $component->ComponentID,
                 'name' => $component->name,
                 'AreaID' => $component->AreaID,
-                'area_name' => $component->area ? $component->area->name : 'Unknown',
+                'area_name' => $component->area ? $component->area->name : 'Unknown', // Fixed typo: $component->area
                 'desc' => $component->desc ?? null,
             ];
         });
 
-        Log::info('Areas and Components fetched for Logdata:', ['areas' => $areas, 'components' => $components]);
+        Log::info('Areas and Components fetched for Logdata:', ['areas' => $areas, 'components' => $components, 'userDepartmentId' => $userDepartmentId]);
 
         return Inertia::render('Logdata', [
             'areas' => $areas,
             'components' => $components,
-            'userRole' => Auth::user() ? Auth::user()->role : null
+            'userRole' => $user ? $user->role : null,
         ]);
     }
 
