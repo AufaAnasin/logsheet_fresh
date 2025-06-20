@@ -67,6 +67,7 @@ import {
 } from '@/components/ui/combobox';
 import { cn } from '@/lib/utils';
 import { ref, computed, watch, onMounted } from 'vue';
+import PlaceholderPattern from '@/components/PlaceholderPattern.vue';
 
 // Define interfaces
 interface Department {
@@ -102,6 +103,7 @@ interface PageProps {
     departments?: Department[] | null;
     areas?: Area[] | null;
     components?: Component[] | null;
+    userRole?: string | null;
 }
 
 // Props with nullable arrays
@@ -170,7 +172,7 @@ const submitDepartment = () => {
         preserveState: true,
         preserveScroll: true,
         onSuccess: () => createDepartmentForm.reset(),
-        onError: () => {},
+        onError: () => { },
     });
 };
 
@@ -203,7 +205,7 @@ const updateDepartment = () => {
         onSuccess: () => {
             isEditDepartmentDialogOpen.value = false;
         },
-        onError: () => {},
+        onError: () => { },
     });
 };
 
@@ -230,7 +232,7 @@ const deleteDepartment = () => {
             isDeleteDepartmentDialogOpen.value = false;
             departmentToDelete.value = null;
         },
-        onError: () => {},
+        onError: () => { },
     });
 };
 
@@ -258,7 +260,7 @@ const submitArea = () => {
             createAreaForm.reset();
             selectedDepartmentID.value = null;
         },
-        onError: () => {},
+        onError: () => { },
     });
 };
 
@@ -306,7 +308,7 @@ const updateArea = () => {
             isEditAreaDialogOpen.value = false;
             selectedDepartmentID.value = null;
         },
-        onError: () => {},
+        onError: () => { },
     });
 };
 
@@ -333,7 +335,7 @@ const deleteArea = () => {
             isDeleteAreaDialogOpen.value = false;
             areaToDelete.value = null;
         },
-        onError: () => {},
+        onError: () => { },
     });
 };
 
@@ -366,7 +368,7 @@ const submitComponent = () => {
             createComponentForm.reset();
             selectedComponentArea.value = null;
         },
-        onError: () => {},
+        onError: () => { },
     });
 };
 
@@ -414,7 +416,7 @@ const updateComponent = () => {
             isEditComponentDialogOpen.value = false;
             selectedEditComponentArea.value = null;
         },
-        onError: () => {},
+        onError: () => { },
     });
 };
 
@@ -441,12 +443,16 @@ const deleteComponent = () => {
             isDeleteComponentDialogOpen.value = false;
             componentToDelete.value = null;
         },
-        onError: () => {},
+        onError: () => { },
     });
 };
+
+const userRole = page.props.userRole; // Add this to access the role
+
 </script>
 
 <template>
+
     <Head title="Dashboard" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
@@ -461,40 +467,58 @@ const deleteComponent = () => {
             <div v-if="flash.error" class="rounded-xl border border-red-200 bg-red-50 p-3 text-red-700">
                 {{ flash.error }}
             </div>
+            <p v-if="userRole === 'SuperUser'" class="text-sm text-gray-600">User Role: {{ userRole }}</p>
+            <p v-else class="text-sm text-gray-600">User Role: Not authenticated</p>
 
             <div class="grid auto-rows-min gap-4 md:grid-cols-3">
                 <!-- Form for adding new department -->
-                <div class="relative flex flex-col min-h-full rounded-xl border border-gray-200 dark:border-gray-800 p-3">
-                    <p><b>Add Department</b></p>
-                    <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
-                        <Label for="department_name">Name</Label>
-                        <Input id="department_name" type="text" placeholder="Put Department name ..." v-model="createDepartmentForm.name" @input="createDepartmentForm.errors.name = undefined" />
-                        <span v-if="createDepartmentForm.errors.name" class="text-red-500 text-sm">{{ createDepartmentForm.errors.name }}</span>
-                    </div>
-                    <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
-                        <Label for="department_description">Description</Label>
-                        <Input id="department_description" type="text" placeholder="Input Department description ..." v-model="createDepartmentForm.desc" @input="createDepartmentForm.errors.desc = undefined" />
-                        <span v-if="createDepartmentForm.errors.desc" class="text-red-500 text-sm">{{ createDepartmentForm.errors.desc }}</span>
-                    </div>
-                    <Button class="mt-auto w-full" @click="submitDepartment" :disabled="createDepartmentForm.processing">
-                        <CirclePlus class="w-4 h-4 mr-2" />
-                        {{ createDepartmentForm.processing ? 'Submitting...' : 'Submit Department' }}
-                    </Button>
+                <div v-if="userRole === 'SuperUser'"
+                    class="relative flex flex-col min-h-full rounded-xl border border-gray-200 dark:border-gray-800 p-3">
+                        <p><b>Add Department</b></p>
+                        <!-- Display User Role -->
+                        <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
+                            <Label for="department_name">Name</Label>
+                            <Input id="department_name" type="text" placeholder="Put Department name ..."
+                                v-model="createDepartmentForm.name"
+                                @input="createDepartmentForm.errors.name = undefined" />
+                            <span v-if="createDepartmentForm.errors.name" class="text-red-500 text-sm">{{
+                                createDepartmentForm.errors.name }}</span>
+                        </div>
+                        <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
+                            <Label for="department_description">Description</Label>
+                            <Input id="department_description" type="text"
+                                placeholder="Input Department description ..." v-model="createDepartmentForm.desc"
+                                @input="createDepartmentForm.errors.desc = undefined" />
+                            <span v-if="createDepartmentForm.errors.desc" class="text-red-500 text-sm">{{
+                                createDepartmentForm.errors.desc }}</span>
+                        </div>
+                        <Button class="mt-auto w-full" @click="submitDepartment"
+                            :disabled="createDepartmentForm.processing">
+                            <CirclePlus class="w-4 h-4 mr-2" />
+                            {{ createDepartmentForm.processing ? 'Submitting...' : 'Submit Department' }}
+                        </Button>
+                </div>
+                <div v-else class="relative flex flex-col min-h-full rounded-xl border border-gray-200 dark:border-gray-800 p-3">
+                    <PlaceholderPattern />
                 </div>
 
                 <!-- Form for adding new area -->
-                <div class="relative flex flex-col min-h-full rounded-xl border border-gray-200 dark:border-gray-800 p-3">
+                <div
+                    class="relative flex flex-col min-h-full rounded-xl border border-gray-200 dark:border-gray-800 p-3">
                     <p><b>Create Area</b></p>
                     <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
                         <Label for="area_name">Area Name</Label>
-                        <Input id="area_name" type="text" placeholder="Input Area name ..." v-model="createAreaForm.name" @input="createAreaForm.errors.name = undefined" />
-                        <span v-if="createAreaForm.errors.name" class="text-red-500 text-sm">{{ createAreaForm.errors.name }}</span>
+                        <Input id="area_name" type="text" placeholder="Input Area name ..."
+                            v-model="createAreaForm.name" @input="createAreaForm.errors.name = undefined" />
+                        <span v-if="createAreaForm.errors.name" class="text-red-500 text-sm">{{
+                            createAreaForm.errors.name }}</span>
                     </div>
                     <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
                         <Label for="area_department">Department</Label>
                         <Popover v-model:open="isAreaComboboxOpen">
                             <PopoverTrigger as-child>
-                                <Button variant="outline" role="combobox" :aria-expanded="isAreaComboboxOpen" class="w-full justify-between">
+                                <Button variant="outline" role="combobox" :aria-expanded="isAreaComboboxOpen"
+                                    class="w-full justify-between">
                                     {{ selectedDepartmentName }}
                                     <ChevronsUpDown class="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                 </Button>
@@ -505,8 +529,12 @@ const deleteComponent = () => {
                                     <CommandEmpty>No department found.</CommandEmpty>
                                     <CommandList>
                                         <CommandGroup>
-                                            <CommandItem v-for="department in safeDepartments" :key="department.DepartmentID" :value="department.DepartmentID.toString()" @select="updateDepartmentID(department.DepartmentID.toString())">
-                                                <Check :class="cn('mr-2 h-4 w-4', selectedDepartmentID === department.DepartmentID.toString() ? 'opacity-100' : 'opacity-0')" />
+                                            <CommandItem v-for="department in safeDepartments"
+                                                :key="department.DepartmentID"
+                                                :value="department.DepartmentID.toString()"
+                                                @select="updateDepartmentID(department.DepartmentID.toString())">
+                                                <Check
+                                                    :class="cn('mr-2 h-4 w-4', selectedDepartmentID === department.DepartmentID.toString() ? 'opacity-100' : 'opacity-0')" />
                                                 {{ department.name }}
                                             </CommandItem>
                                         </CommandGroup>
@@ -514,12 +542,15 @@ const deleteComponent = () => {
                                 </Command>
                             </PopoverContent>
                         </Popover>
-                        <span v-if="createAreaForm.errors.DepartmentID" class="text-red-500 text-sm">{{ createAreaForm.errors.DepartmentID }}</span>
+                        <span v-if="createAreaForm.errors.DepartmentID" class="text-red-500 text-sm">{{
+                            createAreaForm.errors.DepartmentID }}</span>
                     </div>
                     <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
                         <Label for="area_description">Description</Label>
-                        <Input id="area_description" type="text" placeholder="Input Area description ..." v-model="createAreaForm.desc" @input="createAreaForm.errors.desc = undefined" />
-                        <span v-if="createAreaForm.errors.desc" class="text-red-500 text-sm">{{ createAreaForm.errors.desc }}</span>
+                        <Input id="area_description" type="text" placeholder="Input Area description ..."
+                            v-model="createAreaForm.desc" @input="createAreaForm.errors.desc = undefined" />
+                        <span v-if="createAreaForm.errors.desc" class="text-red-500 text-sm">{{
+                            createAreaForm.errors.desc }}</span>
                     </div>
                     <Button class="mt-3 w-full" @click="submitArea" :disabled="createAreaForm.processing">
                         <CirclePlus class="w-4 h-4 mr-2" />
@@ -528,12 +559,15 @@ const deleteComponent = () => {
                 </div>
 
                 <!-- Form for adding new component -->
-                <div class="relative flex flex-col min-h-full rounded-xl border border-gray-200 dark:border-gray-800 p-3">
+                <div
+                    class="relative flex flex-col min-h-full rounded-xl border border-gray-200 dark:border-gray-800 p-3">
                     <p><b>Create Component</b></p>
                     <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
                         <Label for="component_name">Component Name</Label>
-                        <Input id="component_name" type="text" placeholder="Put Component name ..." v-model="createComponentForm.name" @input="createComponentForm.errors.name = undefined" />
-                        <span v-if="createComponentForm.errors.name" class="text-red-500 text-sm">{{ createComponentForm.errors.name }}</span>
+                        <Input id="component_name" type="text" placeholder="Put Component name ..."
+                            v-model="createComponentForm.name" @input="createComponentForm.errors.name = undefined" />
+                        <span v-if="createComponentForm.errors.name" class="text-red-500 text-sm">{{
+                            createComponentForm.errors.name }}</span>
                     </div>
                     <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
                         <Label for="component_area">Which Area?</Label>
@@ -548,7 +582,8 @@ const deleteComponent = () => {
                             </ComboboxAnchor>
                             <ComboboxList>
                                 <div class="relative w-full max-w-sm items-center">
-                                    <ComboboxInput class="focus-visible:ring-0 border-0 border-b rounded-none h-10" placeholder="Search area..." />
+                                    <ComboboxInput class="focus-visible:ring-0 border-0 border-b rounded-none h-10"
+                                        placeholder="Search area..." />
                                     <span class="absolute start-0 inset-y-0 flex items-center justify-center px-3">
                                         <Search class="size-4 text-muted-foreground" />
                                     </span>
@@ -558,18 +593,22 @@ const deleteComponent = () => {
                                     <ComboboxItem v-for="area in safeAreas" :key="area.AreaID" :value="area">
                                         {{ area.name }}
                                         <ComboboxItemIndicator>
-                                            <Check :class="cn('ml-auto h-4 w-4', selectedComponentArea?.AreaID === area.AreaID ? 'opacity-100' : 'opacity-0')" />
+                                            <Check
+                                                :class="cn('ml-auto h-4 w-4', selectedComponentArea?.AreaID === area.AreaID ? 'opacity-100' : 'opacity-0')" />
                                         </ComboboxItemIndicator>
                                     </ComboboxItem>
                                 </ComboboxGroup>
                             </ComboboxList>
                         </Combobox>
-                        <span v-if="createComponentForm.errors.AreaID" class="text-red-500 text-sm">{{ createComponentForm.errors.AreaID }}</span>
+                        <span v-if="createComponentForm.errors.AreaID" class="text-red-500 text-sm">{{
+                            createComponentForm.errors.AreaID }}</span>
                     </div>
                     <div class="grid w-full max-w-sm items-center gap-1.5 mt-2">
                         <Label for="component_description">Description</Label>
-                        <Input id="component_description" type="text" placeholder="Put Component description ..." v-model="createComponentForm.desc" @input="createComponentForm.errors.desc = undefined" />
-                        <span v-if="createComponentForm.errors.desc" class="text-red-500 text-sm">{{ createComponentForm.errors.desc }}</span>
+                        <Input id="component_description" type="text" placeholder="Put Component description ..."
+                            v-model="createComponentForm.desc" @input="createComponentForm.errors.desc = undefined" />
+                        <span v-if="createComponentForm.errors.desc" class="text-red-500 text-sm">{{
+                            createComponentForm.errors.desc }}</span>
                     </div>
                     <Button class="mt-3 w-full" @click="submitComponent" :disabled="createComponentForm.processing">
                         <CirclePlus class="w-4 h-4 mr-2" />
@@ -729,17 +768,24 @@ const deleteComponent = () => {
                     <div class="grid gap-4 py-4">
                         <div class="grid grid-cols-4 items-center gap-4">
                             <Label for="edit_department_name" class="text-right">Name</Label>
-                            <Input id="edit_department_name" type="text" v-model="editDepartmentForm.name" class="col-span-3" @input="editDepartmentForm.errors.name = undefined" />
-                            <span v-if="editDepartmentForm.errors.name" class="text-red-500 text-sm col-start-2 col-span-3">{{ editDepartmentForm.errors.name }}</span>
+                            <Input id="edit_department_name" type="text" v-model="editDepartmentForm.name"
+                                class="col-span-3" @input="editDepartmentForm.errors.name = undefined" />
+                            <span v-if="editDepartmentForm.errors.name"
+                                class="text-red-500 text-sm col-start-2 col-span-3">{{ editDepartmentForm.errors.name
+                                }}</span>
                         </div>
                         <div class="grid grid-cols-4 items-center gap-4">
                             <Label for="edit_department_desc" class="text-right">Description</Label>
-                            <Input id="edit_department_desc" type="text" v-model="editDepartmentForm.desc" class="col-span-3" @input="editDepartmentForm.errors.desc = undefined" />
-                            <span v-if="editDepartmentForm.errors.desc" class="text-red-500 text-sm col-start-2 col-span-3">{{ editDepartmentForm.errors.desc }}</span>
+                            <Input id="edit_department_desc" type="text" v-model="editDepartmentForm.desc"
+                                class="col-span-3" @input="editDepartmentForm.errors.desc = undefined" />
+                            <span v-if="editDepartmentForm.errors.desc"
+                                class="text-red-500 text-sm col-start-2 col-span-3">{{ editDepartmentForm.errors.desc
+                                }}</span>
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button type="button" variant="outline" @click="isEditDepartmentDialogOpen = false">Cancel</Button>
+                        <Button type="button" variant="outline"
+                            @click="isEditDepartmentDialogOpen = false">Cancel</Button>
                         <Button type="submit" @click="updateDepartment" :disabled="editDepartmentForm.processing">
                             {{ editDepartmentForm.processing ? 'Saving...' : 'Save Changes' }}
                         </Button>
@@ -753,7 +799,8 @@ const deleteComponent = () => {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the department "{{ departmentToDelete?.name }}" from the database, if no areas are associated.
+                            This action cannot be undone. This will permanently delete the department "{{
+                            departmentToDelete?.name }}" from the database, if no areas are associated.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -777,15 +824,18 @@ const deleteComponent = () => {
                     <div class="grid gap-4 py-4">
                         <div class="grid grid-cols-4 items-center gap-4">
                             <Label for="edit_area_name" class="text-right">Name</Label>
-                            <Input id="edit_area_name" type="text" v-model="editAreaForm.name" class="col-span-3" @input="editAreaForm.errors.name = undefined" />
-                            <span v-if="editAreaForm.errors.name" class="text-red-500 text-sm col-start-2 col-span-3">{{ editAreaForm.errors.name }}</span>
+                            <Input id="edit_area_name" type="text" v-model="editAreaForm.name" class="col-span-3"
+                                @input="editAreaForm.errors.name = undefined" />
+                            <span v-if="editAreaForm.errors.name" class="text-red-500 text-sm col-start-2 col-span-3">{{
+                                editAreaForm.errors.name }}</span>
                         </div>
                         <div class="grid grid-cols-4 items-center gap-4">
                             <Label for="edit_area_department" class="text-right">Department</Label>
                             <div class="col-span-3">
                                 <Popover v-model:open="isAreaComboboxOpen">
                                     <PopoverTrigger as-child>
-                                        <Button variant="outline" role="combobox" :aria-expanded="isAreaComboboxOpen" class="w-full justify-between">
+                                        <Button variant="outline" role="combobox" :aria-expanded="isAreaComboboxOpen"
+                                            class="w-full justify-between">
                                             {{ selectedDepartmentName }}
                                             <ChevronsUpDown class="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                         </Button>
@@ -796,8 +846,12 @@ const deleteComponent = () => {
                                             <CommandEmpty>No department found.</CommandEmpty>
                                             <CommandList>
                                                 <CommandGroup>
-                                                    <CommandItem v-for="department in safeDepartments" :key="department.DepartmentID" :value="department.DepartmentID.toString()" @select="updateDepartmentID(department.DepartmentID.toString())">
-                                                        <Check :class="cn('mr-2 h-4 w-4', selectedDepartmentID === department.DepartmentID.toString() ? 'opacity-100' : 'opacity-0')" />
+                                                    <CommandItem v-for="department in safeDepartments"
+                                                        :key="department.DepartmentID"
+                                                        :value="department.DepartmentID.toString()"
+                                                        @select="updateDepartmentID(department.DepartmentID.toString())">
+                                                        <Check
+                                                            :class="cn('mr-2 h-4 w-4', selectedDepartmentID === department.DepartmentID.toString() ? 'opacity-100' : 'opacity-0')" />
                                                         {{ department.name }}
                                                     </CommandItem>
                                                 </CommandGroup>
@@ -805,13 +859,16 @@ const deleteComponent = () => {
                                         </Command>
                                     </PopoverContent>
                                 </Popover>
-                                <span v-if="editAreaForm.errors.DepartmentID" class="text-red-500 text-sm">{{ editAreaForm.errors.DepartmentID }}</span>
+                                <span v-if="editAreaForm.errors.DepartmentID" class="text-red-500 text-sm">{{
+                                    editAreaForm.errors.DepartmentID }}</span>
                             </div>
                         </div>
                         <div class="grid grid-cols-4 items-center gap-4">
                             <Label for="edit_area_desc" class="text-right">Description</Label>
-                            <Input id="edit_area_desc" type="text" v-model="editAreaForm.desc" class="col-span-3" @input="editAreaForm.errors.desc = undefined" />
-                            <span v-if="editAreaForm.errors.desc" class="text-red-500 text-sm col-start-2 col-span-3">{{ editAreaForm.errors.desc }}</span>
+                            <Input id="edit_area_desc" type="text" v-model="editAreaForm.desc" class="col-span-3"
+                                @input="editAreaForm.errors.desc = undefined" />
+                            <span v-if="editAreaForm.errors.desc" class="text-red-500 text-sm col-start-2 col-span-3">{{
+                                editAreaForm.errors.desc }}</span>
                         </div>
                     </div>
                     <DialogFooter>
@@ -829,7 +886,8 @@ const deleteComponent = () => {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the area "{{ areaToDelete?.name }}" from the database, if no components have log data.
+                            This action cannot be undone. This will permanently delete the area "{{ areaToDelete?.name
+                            }}" from the database, if no components have log data.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -853,8 +911,11 @@ const deleteComponent = () => {
                     <div class="grid gap-4 py-4">
                         <div class="grid grid-cols-4 items-center gap-4">
                             <Label for="edit_component_name" class="text-right">Name</Label>
-                            <Input id="edit_component_name" type="text" v-model="editComponentForm.name" class="col-span-3" @input="editComponentForm.errors.name = undefined" />
-                            <span v-if="editComponentForm.errors.name" class="text-red-500 text-sm col-start-2 col-span-3">{{ editComponentForm.errors.name }}</span>
+                            <Input id="edit_component_name" type="text" v-model="editComponentForm.name"
+                                class="col-span-3" @input="editComponentForm.errors.name = undefined" />
+                            <span v-if="editComponentForm.errors.name"
+                                class="text-red-500 text-sm col-start-2 col-span-3">{{ editComponentForm.errors.name
+                                }}</span>
                         </div>
                         <div class="grid grid-cols-4 items-center gap-4">
                             <Label for="edit_component_area" class="text-right">Area</Label>
@@ -870,8 +931,11 @@ const deleteComponent = () => {
                                     </ComboboxAnchor>
                                     <ComboboxList>
                                         <div class="relative w-full max-w-sm items-center">
-                                            <ComboboxInput class="focus-visible:ring-0 border-0 border-b rounded-none h-10" placeholder="Search area..." />
-                                            <span class="absolute start-0 inset-y-0 flex items-center justify-center px-3">
+                                            <ComboboxInput
+                                                class="focus-visible:ring-0 border-0 border-b rounded-none h-10"
+                                                placeholder="Search area..." />
+                                            <span
+                                                class="absolute start-0 inset-y-0 flex items-center justify-center px-3">
                                                 <Search class="size-4 text-muted-foreground" />
                                             </span>
                                         </div>
@@ -880,23 +944,29 @@ const deleteComponent = () => {
                                             <ComboboxItem v-for="area in safeAreas" :key="area.AreaID" :value="area">
                                                 {{ area.name }}
                                                 <ComboboxItemIndicator>
-                                                    <Check :class="cn('ml-auto h-4 w-4', selectedEditComponentArea?.AreaID === area.AreaID ? 'opacity-100' : 'opacity-0')" />
+                                                    <Check
+                                                        :class="cn('ml-auto h-4 w-4', selectedEditComponentArea?.AreaID === area.AreaID ? 'opacity-100' : 'opacity-0')" />
                                                 </ComboboxItemIndicator>
                                             </ComboboxItem>
                                         </ComboboxGroup>
                                     </ComboboxList>
                                 </Combobox>
-                                <span v-if="editComponentForm.errors.AreaID" class="text-red-500 text-sm">{{ editComponentForm.errors.AreaID }}</span>
+                                <span v-if="editComponentForm.errors.AreaID" class="text-red-500 text-sm">{{
+                                    editComponentForm.errors.AreaID }}</span>
                             </div>
                         </div>
                         <div class="grid grid-cols-4 items-center gap-4">
                             <Label for="edit_component_desc" class="text-right">Description</Label>
-                            <Input id="edit_component_desc" type="text" v-model="editComponentForm.desc" class="col-span-3" @input="editComponentForm.errors.desc = undefined" />
-                            <span v-if="editComponentForm.errors.desc" class="text-red-500 text-sm col-start-2 col-span-3">{{ editComponentForm.errors.desc }}</span>
+                            <Input id="edit_component_desc" type="text" v-model="editComponentForm.desc"
+                                class="col-span-3" @input="editComponentForm.errors.desc = undefined" />
+                            <span v-if="editComponentForm.errors.desc"
+                                class="text-red-500 text-sm col-start-2 col-span-3">{{ editComponentForm.errors.desc
+                                }}</span>
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button type="button" variant="outline" @click="isEditComponentDialogOpen = false">Cancel</Button>
+                        <Button type="button" variant="outline"
+                            @click="isEditComponentDialogOpen = false">Cancel</Button>
                         <Button type="submit" @click="updateComponent" :disabled="editComponentForm.processing">
                             {{ editComponentForm.processing ? 'Saving...' : 'Save Changes' }}
                         </Button>
@@ -910,7 +980,8 @@ const deleteComponent = () => {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the component "{{ componentToDelete?.name }}" from the database, if no log data is associated.
+                            This action cannot be undone. This will permanently delete the component "{{
+                            componentToDelete?.name }}" from the database, if no log data is associated.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
