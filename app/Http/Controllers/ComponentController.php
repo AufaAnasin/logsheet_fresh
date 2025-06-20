@@ -73,7 +73,7 @@ class ComponentController extends Controller
         }
     }
 
-    public function logData(): Response
+public function logData(): Response
     {
         $areas = Area::with('department')->get()->map(function ($area) {
             return [
@@ -100,34 +100,34 @@ class ComponentController extends Controller
         return Inertia::render('Logdata', [
             'areas' => $areas,
             'components' => $components,
+            'userRole' => Auth::user() ? Auth::user()->role : null
         ]);
     }
 
-public function storeLog(Request $request)
-{
-    $validated = $request->validate([
-        'area_id' => 'required|exists:areas,AreaID',
-        'logs' => 'required|array',
-        'logs.*.component_id' => 'required|exists:components,ComponentID',
-        'logs.*.log_message' => 'required|string',
-    ]);
+    public function storeLog(Request $request)
+    {
+        $validated = $request->validate([
+            'area_id' => 'required|exists:areas,AreaID',
+            'logs' => 'required|array',
+            'logs.*.component_id' => 'required|exists:components,ComponentID',
+            'logs.*.log_message' => 'required|string',
+        ]);
 
-    try {
-        foreach ($validated['logs'] as $log) {
-            \App\Models\LogData::create([
-                'ComponentID' => $log['component_id'],
-                'OperatorID' => Auth::user()->id,
-                'LogValue' => $log['log_message'], // Match LogData model field
-                'LogTimestamp' => now(), // Match LogData model field
-                'Notes' => $log['log_message'], // Use log_message as Notes for now
-            ]);
+        try {
+            foreach ($validated['logs'] as $log) {
+                \App\Models\LogData::create([
+                    'OperatorID' => Auth::user()->id,
+                    'ComponentID' => $log['component_id'],
+                    'log_message' => $log['log_message'],
+                    'created_at' => now(),
+                ]);
+            }
+
+            Log::info('Log data stored:', ['area_id' => $validated['area_id'], 'logs' => $validated['logs']]);
+            return redirect()->route('logdata')->with('success', 'Log data submitted successfully!'); // Updated redirect
+        } catch (\Exception $e) {
+            Log::error('Failed to store log data:', ['error' => $e->getMessage(), 'data' => $validated]);
+            return redirect()->back()->withErrors(['error' => 'Failed to store log data. Please try again.'])->withInput();
         }
-
-        Log::info('Log data stored:', ['area_id' => $validated['area_id'], 'logs' => $validated['logs']]);
-        return redirect()->route('logdata')->with('success', 'Log data submitted successfully!');
-    } catch (\Exception $e) {
-        Log::error('Failed to store log data:', ['error' => $e->getMessage(), 'data' => $validated]);
-        return redirect()->back()->withErrors(['error' => 'Failed to store log data. Please try again.'])->withInput();
     }
-}
 }

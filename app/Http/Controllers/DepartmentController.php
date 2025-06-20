@@ -6,6 +6,7 @@ use App\Models\Department;
 use App\Models\Area;
 use App\Models\Component;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
 class DepartmentController extends Controller
@@ -38,6 +39,7 @@ class DepartmentController extends Controller
                     'desc' => $component->desc,
                 ];
             }),
+            'userRole' => Auth::user() ? Auth::user()->role : null,
         ];
         return Inertia::render('Dashboard', $data);
     }

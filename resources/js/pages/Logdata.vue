@@ -32,6 +32,7 @@
   interface PageProps {
       areas?: Area[] | null;
       components?: Component[] | null;
+      userRole?: string | null; // Add userRole to props
   }
 
   const breadcrumbs = [
@@ -43,6 +44,7 @@
   const areas: Area[] = Array.isArray(page.props.areas) ? page.props.areas : [];
   const components: Component[] = Array.isArray(page.props.components) ? page.props.components : [];
   const flash = (page.props.flash || {}) as { success?: string; error?: string };
+  const userRole = page.props.userRole; // Access userRole
 
   // State for selected area and log inputs
   const selectedAreaId = ref<number | null>(null);
@@ -73,12 +75,11 @@
           log_message: logMessage,
       }));
 
-      router.post(route('logdata.store'), { // Use named route
+      router.post(route('logdata.store'), {
           area_id: selectedAreaId.value,
           logs: logData,
       }, {
           onSuccess: () => {
-              // Redirect handled by server, clear inputs here
               logInputs.value = {};
           },
           onError: (errors) => {
@@ -100,6 +101,10 @@
               <div v-if="flash.error" class="rounded-xl border border-red-200 bg-red-50 p-3 text-red-700">
                   {{ flash.error }}
               </div>
+
+              <!-- Display User Role -->
+              <p v-if="userRole" class="text-sm text-gray-600">User Role: {{ userRole }}</p>
+              <p v-else class="text-sm text-gray-600">User Role: Not authenticated</p>
 
               <div class="grid gap-2">
                   <label for="area-select" class="text-sm font-medium">Select Area</label>
