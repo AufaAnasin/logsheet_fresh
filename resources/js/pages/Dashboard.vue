@@ -467,8 +467,6 @@ const userRole = page.props.userRole; // Add this to access the role
             <div v-if="flash.error" class="rounded-xl border border-red-200 bg-red-50 p-3 text-red-700">
                 {{ flash.error }}
             </div>
-            <p v-if="userRole === 'SuperUser'" class="text-sm text-gray-600">User Role: {{ userRole }}</p>
-            <p v-else class="text-sm text-gray-600">User Role: Not authenticated</p>
 
             <div class="grid auto-rows-min gap-4 md:grid-cols-3">
                 <!-- Form for adding new department -->

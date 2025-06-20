@@ -12,7 +12,7 @@ Route::get('/', function () {
 })->name('home');
 
 Route::get('/dashboard', [DepartmentController::class, 'index'])
-    ->middleware(['auth', 'verified'])
+    ->middleware(['auth', 'verified', 'non_operator'])
     ->name('dashboard');
 
 Route::post('/departments', [DepartmentController::class, 'store'])->name('departments.store');
@@ -31,8 +31,8 @@ Route::post('/components', [ComponentController::class, 'store'])->middleware('a
 Route::put('/components/{component}', [ComponentController::class, 'update'])->middleware('auth');
 Route::delete('/components/{component}', [ComponentController::class, 'destroy'])->middleware('auth');
 
-Route::get('/logdata', [ComponentController::class, 'logData'])->name('logdata');
-Route::post('/logdata/store', [ComponentController::class, 'storeLog'])->name('logdata.store'); // Add this line
+Route::get('/logdata', [ComponentController::class, 'logData'])->middleware('operator')->name('logdata');
+Route::post('/logdata/store', [ComponentController::class, 'storeLog'])->middleware('operator')->name('logdata.store');
 
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';
