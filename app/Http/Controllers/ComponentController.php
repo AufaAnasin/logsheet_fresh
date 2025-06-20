@@ -126,13 +126,14 @@ class ComponentController extends Controller
                 \App\Models\LogData::create([
                     'OperatorID' => Auth::user()->id,
                     'ComponentID' => $log['component_id'],
-                    'log_message' => $log['log_message'],
-                    'created_at' => now(),
+                    'LogValue' => $log['log_message'], // Map log_message to LogValue
+                    'LogTimestamp' => now(),          // Set current time
+                    'Notes' => null,                  // Default to null if not provided
                 ]);
             }
 
             Log::info('Log data stored:', ['area_id' => $validated['area_id'], 'logs' => $validated['logs']]);
-            return redirect()->route('logdata')->with('success', 'Log data submitted successfully!'); // Updated redirect
+            return redirect()->route('logdata')->with('success', 'Log data submitted successfully!');
         } catch (\Exception $e) {
             Log::error('Failed to store log data:', ['error' => $e->getMessage(), 'data' => $validated]);
             return redirect()->back()->withErrors(['error' => 'Failed to store log data. Please try again.'])->withInput();

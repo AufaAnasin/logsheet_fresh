@@ -44,7 +44,7 @@
   const areas: Area[] = Array.isArray(page.props.areas) ? page.props.areas : [];
   const components: Component[] = Array.isArray(page.props.components) ? page.props.components : [];
   const flash = (page.props.flash || {}) as { success?: string; error?: string };
-  const userRole = page.props.userRole; // Access userRole
+//   const userRole = page.props.userRole; // Access userRole
 
   // State for selected area and log inputs
   const selectedAreaId = ref<number | null>(null);
@@ -102,9 +102,6 @@
                   {{ flash.error }}
               </div>
 
-              <!-- Display User Role -->
-              <p v-if="userRole" class="text-sm text-gray-600">User Role: {{ userRole }}</p>
-              <p v-else class="text-sm text-gray-600">User Role: Not authenticated</p>
 
               <div class="grid gap-2">
                   <label for="area-select" class="text-sm font-medium">Select Area</label>
