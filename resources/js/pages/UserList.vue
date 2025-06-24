@@ -14,7 +14,7 @@
               <DialogHeader>
                 <DialogTitle>Create User</DialogTitle>
                 <DialogDescription>
-                  Make a user with a default password ("Logsheet123#"). Click save when you're done.
+                  Make a user with a default password. Click save when you're done.
                 </DialogDescription>
               </DialogHeader>
               <form @submit.prevent="createUser" class="grid gap-4 py-4">
