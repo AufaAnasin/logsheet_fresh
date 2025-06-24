@@ -4,6 +4,7 @@ use App\Http\Controllers\AreaController;
 use App\Http\Controllers\ComponentController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\LogdataController;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -34,5 +35,12 @@ Route::delete('/components/{component}', [ComponentController::class, 'destroy']
 Route::get('/logdata', [ComponentController::class, 'logData'])->middleware('operator')->name('logdata');
 Route::post('/logdata/store', [ComponentController::class, 'storeLog'])->middleware('operator')->name('logdata.store');
 
+Route::get('/graphdata', [ComponentController::class, 'graphData'])->middleware('operator')->name('graphdata');
+Route::get('/component-logs/{componentId}', [ComponentController::class, 'getComponentLogs'])->middleware('operator')->name('component.logs');
+
+
+// Route::get('/user', [UserController::class, 'showUserList'])->middleware('auth')->name('user.list');
+Route::get('/userlist', [UserController::class, 'index'])->name('users.index');
+Route::post('/userlist', [UserController::class, 'store'])->name('users.store');
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';

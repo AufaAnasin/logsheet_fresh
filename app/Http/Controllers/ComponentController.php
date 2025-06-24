@@ -139,4 +139,97 @@ class ComponentController extends Controller
             return redirect()->back()->withErrors(['error' => 'Failed to store log data. Please try again.'])->withInput();
         }
     }
+    public function graphData(Request $request): Response
+    {
+        $user = Auth::user();
+        $userDepartmentId = $user ? $user->DepartmentID : null;
+
+        // Fetch areas with filtering by DepartmentID
+        $areas = Area::with('department')
+            ->when($userDepartmentId, function ($query) use ($userDepartmentId) {
+                return $query->where('DepartmentID', $userDepartmentId);
+            })
+            ->get()
+            ->map(function ($area) {
+                return [
+                    'AreaID' => $area->AreaID,
+                    'name' => $area->name,
+                    'DepartmentID' => $area->DepartmentID,
+                    'department_name' => $area->department ? $area->department->name : 'Unknown',
+                    'desc' => $area->desc ?? null,
+                ];
+            });
+
+        // Get selected area ID from request, default to first area if not set and areas exist
+        $selectedAreaId = $request->input('area_id');
+        if (!$selectedAreaId && !empty($areas)) {
+            $selectedAreaId = $areas->first()['AreaID'];
+        }
+
+        // Fetch components for the selected area
+        $components = [];
+        if ($selectedAreaId) {
+            $components = Component::where('AreaID', $selectedAreaId)->with('area')->get()->map(function ($component) {
+                return [
+                    'ComponentID' => $component->ComponentID,
+                    'name' => $component->name,
+                    'AreaID' => $component->AreaID,
+                    'area_name' => $component->area ? $component->area->name : 'Unknown',
+                    'desc' => $component->desc ?? null,
+                ];
+            });
+        }
+
+        // Fetch aggregated log data for components in the selected area
+        $componentLogs = [];
+        if ($selectedAreaId && !empty($components)) {
+            $componentIds = $components->pluck('ComponentID')->toArray();
+            $logs = \App\Models\LogData::whereIn('ComponentID', $componentIds)
+                ->orderBy('LogTimestamp', 'desc')
+                ->take(100) // Limit to recent logs for performance
+                ->get()
+                ->groupBy('ComponentID')
+                ->map(function ($logs, $componentId) {
+                    return $logs->map(function ($log) {
+                        return [
+                            'timestamp' => $log->LogTimestamp->toIsoString(),
+                            'value' => $log->LogValue,
+                        ];
+                    });
+                })->all();
+
+            $componentLogs = $logs;
+        }
+
+        Log::info('GraphData Response:', [
+            'areas' => $areas,
+            'components' => $components,
+            'componentLogs' => $componentLogs,
+            'selectedAreaId' => $selectedAreaId,
+        ]);
+
+        return Inertia::render('GraphData', [
+            'areas' => $areas,
+            'components' => $components,
+            'componentLogs' => $componentLogs,
+            'selectedAreaId' => $selectedAreaId,
+            'userRole' => $user ? $user->role : null,
+        ]);
+    }
+
+    public function getComponentLogs(Request $request, $componentId)
+    {
+        $logs = \App\Models\LogData::where('ComponentID', $componentId)
+            ->orderBy('LogTimestamp', 'desc')
+            ->take(500) // Increased limit for details
+            ->get()
+            ->map(function ($log) {
+                return [
+                    'timestamp' => $log->LogTimestamp->toIsoString(),
+                    'value' => $log->LogValue,
+                ];
+            });
+
+        return response()->json(['logs' => $logs]);
+    }
 }
