@@ -42,5 +42,7 @@ Route::get('/component-logs/{componentId}', [ComponentController::class, 'getCom
 // Route::get('/user', [UserController::class, 'showUserList'])->middleware('auth')->name('user.list');
 Route::get('/userlist', [UserController::class, 'index'])->name('users.index');
 Route::post('/userlist', [UserController::class, 'store'])->name('users.store');
+Route::put('/userlist/{id}', [UserController::class, 'update'])->name('users.update');
+Route::delete('/userlist/{id}', [UserController::class, 'destroy'])->name('users.destroy');
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';

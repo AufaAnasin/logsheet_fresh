@@ -72,4 +72,52 @@ class UserController extends Controller
 
         return redirect()->route('users.index')->with('success', 'User created successfully.');
     }
+    public function update(Request $request, $id)
+    {
+        $user = User::findOrFail($id);
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => [
+                'required',
+                'email',
+                'max:255',
+                'unique:users,email,' . $user->id,
+            ],
+            'role' => 'required|in:SuperUser,DepartmentAdmin,Operator',
+            'department_id' => [
+                'required',
+                'integer',
+                'exists:departments,DepartmentID',
+            ],
+        ]);
+
+        try {
+            $user->update([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'role' => $validated['role'],
+                'DepartmentID' => $validated['department_id'],
+            ]);
+        } catch (\Exception $e) {
+            return redirect()->back()
+                ->withInput()
+                ->withErrors(['error' => 'Failed to update user. Please try again.']);
+        }
+
+        return redirect()->route('users.index')->with('success', 'User updated successfully.');
+    }
+
+    public function destroy($id)
+    {
+        try {
+            $user = User::findOrFail($id);
+            $user->delete();
+        } catch (\Exception $e) {
+            return redirect()->back()
+                ->withErrors(['error' => 'Failed to delete user. Please try again.']);
+        }
+
+        return redirect()->route('users.index')->with('success', 'User deleted successfully.');
+    }
 }
