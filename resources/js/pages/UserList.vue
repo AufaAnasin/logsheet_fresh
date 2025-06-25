@@ -35,7 +35,7 @@
               <div class="grid grid-cols-4 items-center gap-4">
                 <Label for="role" class="text-right">Role</Label>
                 <div class="col-span-3">
-                  <Select v-model="form.role" class="w-full">
+                  <Select v-model="form.role">
                     <SelectTrigger class="w-full">
                       <SelectValue placeholder="Select a Role" />
                     </SelectTrigger>
@@ -71,7 +71,7 @@
                 </div>
               </div>
               <DialogFooter>
-                <Button type="submit" :disabled="form.processing">Save</Button>
+                <Button type="submit" :disabled="form.processing"><Save />Save</Button>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -104,6 +104,7 @@
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Department</TableHead>
+                  <TableHead>Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -115,13 +116,119 @@
                     {{ user.role === 'SuperUser' ? 'Super Admin' : user.role === 'DepartmentAdmin' ? 'Admin' : 'Operator' }}
                   </TableCell>
                   <TableCell>{{ user.department_name }}</TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger as-child>
+                        <Button variant="ghost">
+                          <Ellipsis />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent class="w-56">
+                        <DropdownMenuLabel>Manage User</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuGroup>
+                          <DropdownMenuItem @click.stop="openEditDialog(user)">
+                            <FilePenLine />
+                            <span>Edit</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem @click.stop="openDeleteDialog(user)">
+                            <Delete />
+                            <span>Delete</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuGroup>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
                 </TableRow>
                 <TableRow v-if="!paginatedUsers.length">
-                  <TableCell colspan="5" class="text-center">No results found.</TableCell>
+                  <TableCell colspan="6" class="text-center">No results found.</TableCell>
                 </TableRow>
               </TableBody>
             </Table>
           </div>
+          <!-- Edit Dialog -->
+          <Dialog :open="isEditDialogOpen" @update:open="closeEditDialog">
+            <DialogContent class="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Edit User</DialogTitle>
+                <DialogDescription>
+                  Make changes to the user here. Click save when you're done.
+                </DialogDescription>
+              </DialogHeader>
+              <form @submit.prevent="updateUser" class="grid gap-4 py-4">
+                <div class="grid grid-cols-4 items-center gap-4">
+                  <Label for="edit-name" class="text-right">Name</Label>
+                  <div class="col-span-3">
+                    <Input id="edit-name" v-model="editForm.name" placeholder="Enter user name" class="w-full" />
+                    <p v-if="editForm.errors.name" class="text-red-500 text-sm mt-1">{{ editForm.errors.name }}</p>
+                  </div>
+                </div>
+                <div class="grid grid-cols-4 items-center gap-4">
+                  <Label for="edit-email" class="text-right">Email</Label>
+                  <div class="col-span-3">
+                    <Input id="edit-email" v-model="editForm.email" placeholder="Enter BAI email" class="w-full" />
+                    <p v-if="editForm.errors.email" class="text-red-500 text-sm mt-1">{{ editForm.errors.email }}</p>
+                  </div>
+                </div>
+                <div class="grid grid-cols-4 items-center gap-4">
+                  <Label for="edit-role" class="text-right">Role</Label>
+                  <div class="col-span-3">
+                    <Select v-model="editForm.role" class="w-full">
+                      <SelectTrigger class="w-full">
+                        <SelectValue placeholder="Select a Role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectLabel>Role</SelectLabel>
+                          <SelectItem value="SuperUser">Super Admin</SelectItem>
+                          <SelectItem value="DepartmentAdmin">Admin</SelectItem>
+                          <SelectItem value="Operator">Operator</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    <p v-if="editForm.errors.role" class="text-red-500 text-sm mt-1">{{ editForm.errors.role }}</p>
+                  </div>
+                </div>
+                <div class="grid grid-cols-4 items-center gap-4">
+                  <Label for="edit-department" class="text-right">Department</Label>
+                  <div class="col-span-3">
+                    <Select v-model="editForm.department_id" class="w-full">
+                      <SelectTrigger class="w-full">
+                        <SelectValue placeholder="Select a Department" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectLabel>Departments</SelectLabel>
+                          <SelectItem v-for="department in departments" :key="department.DepartmentID" :value="department.DepartmentID">
+                            {{ department.name }}
+                          </SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    <p v-if="editForm.errors.department_id" class="text-red-500 text-sm mt-1">{{ editForm.errors.department_id }}</p>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button type="submit" :disabled="editForm.processing">Save changes</Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+          <!-- Delete Dialog -->
+          <Dialog :open="isDeleteDialogOpen" @update:open="closeDeleteDialog">
+            <DialogContent class="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Delete User</DialogTitle>
+                <DialogDescription>
+                  Are you sure you want to delete {{ editForm.name || 'this user' }}? This action cannot be undone.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" @click="closeDeleteDialog">Cancel</Button>
+                <Button variant="destructive" @click="deleteUser(editForm.id)" :disabled="deleteForm.processing"><Delete />Delete</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <Pagination v-slot="{ page }" :items-per-page="itemsPerPage" :total="filteredUsers.length" :default-page="1">
             <PaginationContent v-slot="{ items }">
               <PaginationPrevious @click="currentPage = Math.max(1, currentPage - 1)" :disabled="currentPage === 1" />
@@ -159,7 +266,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Search } from 'lucide-vue-next';
+import { Plus, Search, Ellipsis, FilePenLine, Delete, Save } from 'lucide-vue-next';
 import {
   Select,
   SelectContent,
@@ -186,6 +293,15 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { computed, ref, watch } from 'vue';
 
@@ -206,6 +322,7 @@ const breadcrumbs = [
   { title: 'User List', href: '/userlist' },
 ];
 
+// Create User Form
 const form = useForm({
   name: '',
   email: '',
@@ -219,9 +336,79 @@ const createUser = () => {
       form.reset();
     },
     onError: (errors) => {
-      console.log('Errors:', errors);
+      console.log('Create Errors:', errors);
     },
   });
+};
+
+// Edit User Form
+const editForm = useForm({
+  id: null as string | null,
+  name: '',
+  email: '',
+  role: null as string | null,
+  department_id: null as number | null,
+});
+
+const isEditDialogOpen = ref(false);
+const isDeleteDialogOpen = ref(false);
+
+const openEditDialog = (user: User) => {
+  editForm.id = user.id;
+  editForm.name = user.name;
+  editForm.email = user.email;
+  editForm.role = user.role;
+  editForm.department_id = props.departments.find(d => d.name === user.department_name)?.DepartmentID || null;
+  setTimeout(() => {
+    isEditDialogOpen.value = true;
+  }, 100); // Slight delay to avoid dropdown interference
+};
+
+const closeEditDialog = () => {
+  isEditDialogOpen.value = false;
+  editForm.reset();
+};
+
+const updateUser = () => {
+  if (editForm.id) {
+    editForm.put(route('users.update', editForm.id), {
+      onSuccess: () => {
+        closeEditDialog();
+      },
+      onError: (errors) => {
+        console.log('Update Errors:', errors);
+      },
+    });
+  }
+};
+
+// Delete User Form
+const deleteForm = useForm({});
+
+const openDeleteDialog = (user: User) => {
+  editForm.id = user.id; // Store ID for deletion
+  editForm.name = user.name; // For display in dialog
+  setTimeout(() => {
+    isDeleteDialogOpen.value = true;
+  }, 100); // Slight delay to avoid dropdown interference
+};
+
+const closeDeleteDialog = () => {
+  isDeleteDialogOpen.value = false;
+  editForm.reset();
+};
+
+const deleteUser = (id: string | null) => {
+  if (id) {
+    deleteForm.delete(route('users.destroy', id), {
+      onSuccess: () => {
+        closeDeleteDialog();
+      },
+      onError: (errors) => {
+        console.log('Delete Errors:', errors);
+      },
+    });
+  }
 };
 
 // Search and Pagination logic
