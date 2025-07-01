@@ -14,12 +14,18 @@ class CheckOperatorRole
         ob_start(); // Prevent headers already sent error
         if (Auth::check()) {
             Log::debug('Role Check', ['role' => Auth::user()->role ?? 'null', 'url' => $request->url()]);
-            $allowedRoles = ['Operator', 'DepartmentAdmin', 'SuperUser'];
-            if (in_array(Auth::user()->role, $allowedRoles)) {
-                return $next($request);
+
+            // Specific check for /logdata route
+            if ($request->is('logdata') || $request->is('logdata/*')) {
+                if (Auth::user()->role === 'Operator') {
+                    return $next($request);
+                }
+                return $next($request); // Allow Admin/SuperAdmin to access /logdata
             }
-            return redirect('/dashboard')->with('error', 'You do not have permission to access the Logsheet page.');
+
+            // No action for other routes, handled by other middleware
+            return $next($request);
         }
-        return redirect('/login')->with('error', 'Please log in to access the Logsheet page.');
+        return redirect('/login')->with('error', 'Please log in to access this page.');
     }
 }

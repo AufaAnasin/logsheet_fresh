@@ -109,7 +109,7 @@ class LogdataController extends Controller
             Log::warning("Component not found for ID: {$componentId}");
             return Inertia::render('TableAndVisualize', [
                 'title' => 'Visualize and Table',
-                'description' => 'This page allows you to visualize and table data.',
+                'description' => 'This page allows you to visualize and table all log data.',
                 'component' => null,
                 'logs' => [],
                 'chart_data' => [
@@ -128,7 +128,7 @@ class LogdataController extends Controller
             Log::warning("Unauthorized access to component ID: {$componentId} by user ID: {$user->id}");
             return Inertia::render('TableAndVisualize', [
                 'title' => 'Visualize and Table',
-                'description' => 'This page allows you to visualize and table data.',
+                'description' => 'This page allows you to visualize and table all log data.',
                 'component' => null,
                 'logs' => [],
                 'chart_data' => [
@@ -143,36 +143,36 @@ class LogdataController extends Controller
             ]);
         }
 
+        // Fetch all logs for the table
         $logs = $component->logs->map(function ($log) {
             return [
                 'LogID' => $log->LogID,
                 'ComponentID' => $log->ComponentID,
                 'LogValue' => $log->LogValue,
                 'LogTimestamp' => $log->LogTimestamp ? $log->LogTimestamp->format('Y-m-d H:i:s') : 'N/A',
-                'Notes' => $log->Notes,
                 'OperatorName' => $log->operator ? $log->operator->name : 'Unknown',
             ];
         })->sortByDesc('LogTimestamp')->values();
 
-        $chartData = $component->logs->filter(function ($log) {
-            return $log->LogValue !== null && $log->LogTimestamp !== null;
-        })->groupBy(function ($log) {
-            return $log->LogTimestamp->format('Y-m-d');
-        })->map(function ($logs, $date) {
-            return [
-                'date' => $date,
-                'value' => $logs->sum('LogValue'), // Sum LogValue per day
-            ];
-        })->sortBy('date')->values();
+        // Fetch all logs for the chart with individual values
+        $chartData = $component->logs->whereNotNull('LogValue')->whereNotNull('LogTimestamp')
+            ->map(function ($log) {
+                return [
+                    'date' => $log->LogTimestamp->format('Y-m-d H:i:s'),
+                    'value' => $log->LogValue,
+                ];
+            })->sortBy('date')->values();
+
+        $chartDataArray = $chartData->isEmpty() ? [['date' => 'No Data', 'value' => 0]] : $chartData->all();
 
         Log::info("Chart data for component ID: {$componentId}", [
-            'chart_data' => $chartData->toArray(),
+            'chart_data' => $chartDataArray,
             'logs_count' => $logs->count(),
         ]);
 
         return Inertia::render('TableAndVisualize', [
             'title' => 'Visualize and Table',
-            'description' => 'This page allows you to visualize and table data.',
+            'description' => 'This page allows you to visualize and table all log data.',
             'component' => [
                 'ComponentID' => $component->ComponentID,
                 'name' => $component->name,
@@ -184,19 +184,13 @@ class LogdataController extends Controller
             'chart_data' => [
                 'xAxis' => [
                     'type' => 'category',
-                    'data' => $chartData->pluck('date')->toArray(),
+                    'data' => array_column($chartDataArray, 'date'),
                 ],
                 'series' => [
                     [
                         'name' => $component->name,
-                        'type' => 'line',
-                        'data' => $chartData->pluck('value')->toArray(),
-                        'lineStyle' => [
-                            'color' => '#3b82f6',
-                        ],
-                        'smooth' => true,
-                        'symbol' => 'circle',
-                        'symbolSize' => 8,
+                        'type' => 'bar',
+                        'data' => array_column($chartDataArray, 'value'),
                     ],
                 ],
             ],

@@ -19,8 +19,11 @@
       <!-- Component Details and Chart -->
       <div v-if="props.component">
         <h2 class="text-xl font-semibold mb-4">Log Data for {{ props.component.name }}</h2>
-        <div class="relative flex-1 rounded-xl border border-gray-200 dark:border-gray-800 p-3 mb-4 h-96">
-          <VChart :option="chartOptions" autoresize />
+        <div v-if="(props.chart_data?.xAxis?.data ?? []).length > 0" class="relative flex-1 rounded-xl border border-gray-200 dark:border-gray-800 p-3 mb-4 h-96">
+          <Bar :chart-data="chartData" :options="chartOptions" />
+        </div>
+        <div v-else class="rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-yellow-700 mb-4">
+          No chart data available for this component.
         </div>
         <div class="relative flex-1 rounded-xl border border-gray-200 dark:border-gray-800 p-3">
           <p class="text-lg font-semibold mb-2">Log Entries for {{ props.component.name }}</p>
@@ -58,7 +61,6 @@
 </template>
 
 <script setup lang="ts">
-import VChart from 'vue-echarts';
 import { usePage } from '@inertiajs/vue3';
 import {
   Table,
@@ -78,7 +80,6 @@ interface Log {
   ComponentID: number;
   LogValue: number | null;
   LogTimestamp: string;
-  Notes: string | null;
   OperatorName: string;
 }
 
@@ -92,7 +93,7 @@ interface Component {
 
 interface ChartData {
   xAxis: { type: string; data: string[] };
-  series: { name: string; type: string; data: (number | null)[]; lineStyle: { color: string }; smooth: boolean; symbol: string; symbolSize: number }[];
+  series: { name: string; type: string; data: (number | null)[] }[];
 }
 
 interface Flash {
@@ -117,7 +118,7 @@ const props = defineProps<{
   description: string;
   component: Component | null;
   logs: Log[] | null;
-  chart_data: ChartData;
+  chart_data: ChartData | null; // Allow null to handle edge cases
 }>();
 
 // Get user and department ID from page props
@@ -145,55 +146,50 @@ const breadcrumbs = computed(() => [
   { title: `Log Data for ${props.component?.name ?? 'Unknown Component'}`, href: '' },
 ]);
 
-// ECharts options
+// Chart data for Bar chart with all individual values
+const chartData = computed(() => {
+  if (!props.chart_data || !props.chart_data.xAxis.data.length) {
+    return {
+      labels: ['No Data'],
+      datasets: [{ label: props.component?.name ?? 'Component', backgroundColor: '#3b82f6', data: [0] }],
+    };
+  }
+  return {
+    labels: props.chart_data.xAxis.data,
+    datasets: props.chart_data.series.map(series => ({
+      label: series.name,
+      backgroundColor: '#3b82f6',
+      data: series.data,
+    })),
+  };
+});
+
+// Chart options
 const chartOptions = computed(() => ({
-  xAxis: {
-    ...props.chart_data.xAxis,
-    name: 'Date',
-    axisLabel: {
-      rotate: 45,
+  responsive: true,
+  maintainAspectRatio: false,
+  scales: {
+    x: {
+      title: { display: true, text: 'Timestamp' }, // Updated to reflect individual timestamps
+    },
+    y: {
+      title: { display: true, text: 'Log Value' },
+      beginAtZero: true,
     },
   },
-  yAxis: {
-    type: 'value',
-    name: 'Log Value',
-    min: 0,
-    axisLabel: {
-      formatter: '{value}',
+  plugins: {
+    legend: { position: 'top' },
+    title: {
+      display: true,
+      text: `Log Data for ${props.component?.name ?? 'Component'}`,
+      align: 'center',
+    },
+    tooltip: {
+      callbacks: {
+        label: (context) => `${context.label}: ${context.raw ?? 'N/A'}`,
+      },
     },
   },
-  series: props.chart_data.series,
-  tooltip: {
-    trigger: 'axis',
-    formatter: (params: any) => {
-      const data = params[0];
-      return `${data.seriesName}<br/>${data.name}: ${data.value ?? 'N/A'}`;
-    },
-  },
-  legend: {
-    top: '5%',
-  },
-  title: {
-    text: `Log Data for ${props.component?.name ?? 'Component'}`,
-    left: 'center',
-  },
-  grid: {
-    left: '10%',
-    right: '10%',
-    bottom: '20%',
-  },
-  dataZoom: [
-    {
-      type: 'slider',
-      xAxisIndex: 0,
-      start: 0,
-      end: 100,
-    },
-    {
-      type: 'inside',
-      xAxisIndex: 0,
-    },
-  ],
 }));
 
 // Debug chart data
