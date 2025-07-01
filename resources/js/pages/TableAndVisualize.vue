@@ -1,8 +1,11 @@
 <template>
   <AppLayout :breadcrumbs="breadcrumbs">
     <div class="p-4">
-      <h1 class="text-2xl font-bold mb-4">{{ props.title }}</h1>
-      <p class="text-gray-600 mb-4">{{ props.description }}</p>
+      <div class="p-2">
+        <div class="mb-4">
+          <apexchart type="line" :options="chartOptions" :series="series" :height="300"></apexchart>
+        </div>
+      </div>
 
       <!-- Flash Messages -->
       <div v-if="flash.success" class="rounded-xl border border-green-200 bg-green-50 p-3 text-green-700 mb-4">
@@ -18,10 +21,6 @@
 
       <!-- Component Details and Chart -->
       <div v-if="props.component">
-        <h2 class="text-xl font-semibold mb-4">Log Data for {{ props.component.name }}</h2>
-        <div class="relative flex-1 rounded-xl border border-gray-200 dark:border-gray-800 p-3 mb-4 h-96">
-          <VChart :option="chartOptions" autoresize />
-        </div>
         <div class="relative flex-1 rounded-xl border border-gray-200 dark:border-gray-800 p-3">
           <p class="text-lg font-semibold mb-2">Log Entries for {{ props.component.name }}</p>
           <Table>
@@ -58,7 +57,7 @@
 </template>
 
 <script setup lang="ts">
-import VChart from 'vue-echarts';
+import { ref, computed, reactive, watch } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 import {
   Table,
@@ -69,7 +68,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { computed, watch } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 
 // Define interfaces
@@ -78,7 +76,6 @@ interface Log {
   ComponentID: number;
   LogValue: number | null;
   LogTimestamp: string;
-  Notes: string | null;
   OperatorName: string;
 }
 
@@ -92,7 +89,7 @@ interface Component {
 
 interface ChartData {
   xAxis: { type: string; data: string[] };
-  series: { name: string; type: string; data: (number | null)[]; lineStyle: { color: string }; smooth: boolean; symbol: string; symbolSize: number }[];
+  series: { name: string; type: string; data: (number | null)[] }[];
 }
 
 interface Flash {
@@ -117,7 +114,7 @@ const props = defineProps<{
   description: string;
   component: Component | null;
   logs: Log[] | null;
-  chart_data: ChartData;
+  chart_data: ChartData | null; // Allow null to handle edge cases
 }>();
 
 // Get user and department ID from page props
@@ -145,59 +142,118 @@ const breadcrumbs = computed(() => [
   { title: `Log Data for ${props.component?.name ?? 'Unknown Component'}`, href: '' },
 ]);
 
-// ECharts options
-const chartOptions = computed(() => ({
-  xAxis: {
-    ...props.chart_data.xAxis,
-    name: 'Date',
-    axisLabel: {
-      rotate: 45,
+// Chart options using reactive for nested properties
+const chartOptions = reactive({
+  chart: {
+    id: 'log-data-chart',
+    toolbar: {
+      show: false,
+    },
+    animations: {
+      enabled: true,
+      easing: 'easeinout',
+      speed: 800,
     },
   },
-  yAxis: {
-    type: 'value',
-    name: 'Log Value',
+  xaxis: {
+    type: 'datetime',
+    categories: computed(() => safeLogs.value
+      .map(log => log.LogTimestamp !== 'N/A' ? new Date(log.LogTimestamp).getTime() : null)
+      .filter(timestamp => timestamp !== null) as number[]),
+    title: {
+      text: 'Timestamp',
+    },
+    labels: {
+      rotate: -45,
+      hideOverlappingLabels: true,
+      formatter: (value: number) => {
+        const date = new Date(value);
+        const allSameDay = safeLogs.value.every(log => {
+          const logDate = new Date(log.LogTimestamp);
+          return logDate.toDateString() === date.toDateString();
+        });
+        return allSameDay
+          ? date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+          : date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      },
+    },
+  },
+  yaxis: {
+    title: {
+      text: 'Log Value',
+    },
     min: 0,
-    axisLabel: {
-      formatter: '{value}',
-    },
-  },
-  series: props.chart_data.series,
-  tooltip: {
-    trigger: 'axis',
-    formatter: (params: any) => {
-      const data = params[0];
-      return `${data.seriesName}<br/>${data.name}: ${data.value ?? 'N/A'}`;
-    },
-  },
-  legend: {
-    top: '5%',
   },
   title: {
-    text: `Log Data for ${props.component?.name ?? 'Component'}`,
-    left: 'center',
-  },
-  grid: {
-    left: '10%',
-    right: '10%',
-    bottom: '20%',
-  },
-  dataZoom: [
-    {
-      type: 'slider',
-      xAxisIndex: 0,
-      start: 0,
-      end: 100,
+    text: 'Log Data Trend',
+    align: 'center',
+    style: {
+      fontSize: '16px',
     },
+  },
+  tooltip: {
+    x: {
+      formatter: (timestamp: number) => {
+        const date = new Date(timestamp);
+        const allSameDay = safeLogs.value.every(log => {
+          const logDate = new Date(log.LogTimestamp);
+          return logDate.toDateString() === date.toDateString();
+        });
+        return allSameDay
+          ? date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+          : date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      },
+    },
+    y: {
+      formatter: (value: number) => `${value} units`,
+    },
+  },
+  responsive: [
     {
-      type: 'inside',
-      xAxisIndex: 0,
+      breakpoint: 640,
+      options: {
+        chart: {
+          width: '100%',
+        },
+        xaxis: {
+          labels: {
+            rotate: 0,
+          },
+        },
+      },
     },
   ],
-}));
+});
 
-// Debug chart data
-watch(() => props.chart_data, (newChartData) => {
-  console.log('Chart Data:', newChartData);
+// Chart series
+const series = ref([
+  {
+    name: computed(() => props.component?.name ?? 'Component'),
+    data: computed(() => safeLogs.value
+      .map(log => ({
+        x: log.LogTimestamp !== 'N/A' ? new Date(log.LogTimestamp).getTime() : null,
+        y: log.LogValue !== null ? log.LogValue : null,
+      }))
+      .filter(point => point.x !== null && point.y !== null)),
+  },
+]);
+
+// Watch for logs updates
+watch(() => props.logs, (newLogs) => {
+  console.log('Logs Data:', newLogs);
 }, { immediate: true });
 </script>
+
+<style scoped>
+/* Ensure chart container adapts to content */
+.apexcharts-canvas {
+  margin: 0 auto;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .apexcharts-canvas {
+    width: 100% !important;
+  }
+}
+</style>

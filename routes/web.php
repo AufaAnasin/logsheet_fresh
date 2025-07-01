@@ -14,9 +14,14 @@ Route::get('/', function () {
 
 Route::middleware(['auth', 'verified', 'non_operator'])->group(function () {
     Route::get('/dashboard', [DepartmentController::class, 'index'])->name('dashboard');
-});
+    Route::get('/analytics', [LogdataController::class, 'analytics'])->name('analytics');
+    Route::get('/analytics/components/{area}', [LogdataController::class, 'componentsInsights'])->name('components.insights');
+    Route::get('/userlist', [UserController::class, 'index'])->name('users.index');
+    Route::post('/userlist', [UserController::class, 'store'])->name('users.store');
+    Route::put('/userlist/{id}', [UserController::class, 'update'])->name('users.update');
+    Route::delete('/userlist/{id}', [UserController::class, 'destroy'])->name('users.destroy');
+    Route::get('/visualizeandtable/{componentId}', [LogdataController::class, 'visualizeandtable'])->name('visualizeandtable');
 
-Route::middleware(['auth'])->group(function () {
     Route::post('/departments', [DepartmentController::class, 'store'])->name('departments.store');
     Route::put('/departments/{department}', [DepartmentController::class, 'update'])->name('departments.update');
     Route::delete('/departments/{department}', [DepartmentController::class, 'destroy'])->name('departments.destroy');
@@ -32,15 +37,6 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/components', [ComponentController::class, 'store']);
     Route::put('/components/{component}', [ComponentController::class, 'update']);
     Route::delete('/components/{component}', [ComponentController::class, 'destroy']);
-
-    Route::get('/analytics', [LogdataController::class, 'analytics'])->name('analytics');
-    Route::get('/analytics/components/{area}', [LogdataController::class, 'componentsInsights'])->name('components.insights');
-    Route::get('/userlist', [UserController::class, 'index'])->name('users.index');
-    Route::post('/userlist', [UserController::class, 'store'])->name('users.store');
-    Route::put('/userlist/{id}', [UserController::class, 'update'])->name('users.update');
-    Route::delete('/userlist/{id}', [UserController::class, 'destroy'])->name('users.destroy');
-
-    Route::get('/visualizeandtable/{componentId}', [LogdataController::class, 'visualizeandtable'])->name('visualizeandtable');
 });
 
 Route::middleware(['auth', 'operator'])->group(function () {

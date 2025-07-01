@@ -12,10 +12,13 @@ class CheckNonOperatorRole
     public function handle(Request $request, Closure $next)
     {
         ob_start();
-        if (Auth::check() && Auth::user()->role !== 'Operator') {
+        if (Auth::check()) {
             Log::debug('Non-Operator Check', ['role' => Auth::user()->role ?? 'null', 'url' => $request->url()]);
-            return $next($request);
+            if (Auth::user()->role !== 'Operator' || ($request->is('logdata') || $request->is('logdata/*'))) {
+                return $next($request);
+            }
+            return redirect('/logdata')->with('error', 'Operators can only access the Logsheet page.');
         }
-        return redirect('/logdata')->with('error', 'Operators can only access the Logsheet page.');
+        return redirect('/login')->with('error', 'Please log in to access this page.');
     }
 }

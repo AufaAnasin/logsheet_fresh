@@ -6,28 +6,21 @@ import type { DefineComponent } from 'vue';
 import { createApp, h } from 'vue';
 import { ZiggyVue } from 'ziggy-js';
 import { initializeTheme } from './composables/useAppearance';
+import VueApexCharts from "vue3-apexcharts";
 
-import * as echarts from 'echarts/core';
-import { CanvasRenderer } from 'echarts/renderers';
-import { LineChart } from 'echarts/charts';
+// Import Chart.js and vue-chartjs
+import { Bar } from 'vue-chartjs';
 import {
-  GridComponent,
-  TooltipComponent,
-  TitleComponent,
-  LegendComponent,
-  DataZoomComponent,
-} from 'echarts/components';
-import VChart from 'vue-echarts';
+  Chart as ChartJS,
+  Title,
+  Tooltip,
+  Legend,
+  BarElement,
+  CategoryScale,
+  LinearScale,
+} from 'chart.js';
 
-echarts.use([
-  CanvasRenderer,
-  LineChart,
-  GridComponent,
-  TooltipComponent,
-  TitleComponent,
-  LegendComponent,
-  DataZoomComponent,
-]);
+ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale);
 
 // Extend ImportMeta interface for Vite
 declare module 'vite/client' {
@@ -51,7 +44,8 @@ createInertiaApp({
         createApp({ render: () => h(App, props) })
             .use(plugin)
             .use(ZiggyVue)
-            .component('VChart', VChart) // Register VChart globally
+            .use(VueApexCharts)
+            .component('Bar', Bar) // Register Bar component
             .mount(el);
     },
     progress: {
@@ -59,5 +53,4 @@ createInertiaApp({
     },
 });
 
-// Set light/dark mode on page load
 initializeTheme();

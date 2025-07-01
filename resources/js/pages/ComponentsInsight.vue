@@ -97,9 +97,9 @@ const props = defineProps<{
 
 // Get user and department ID from page props
 const page = usePage<{ props: PageProps }>();
-const user = computed(() => page.props.user);
-const userDepartmentId = computed(() => user.value?.DepartmentID ?? null);
-const userRole = computed(() => user.value?.role ?? null);
+const user = computed(() => page.props.user ?? ({ DepartmentID: null, role: null } as { DepartmentID: number | null; role: string | null }));
+const userDepartmentId = computed(() => user.value.DepartmentID);
+const userRole = computed(() => user.value.role);
 
 // Safe components array
 const safeComponents = computed(() => Array.isArray(props.components) ? props.components : []);
