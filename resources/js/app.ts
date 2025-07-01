@@ -7,7 +7,29 @@ import { createApp, h } from 'vue';
 import { ZiggyVue } from 'ziggy-js';
 import { initializeTheme } from './composables/useAppearance';
 
-// Extend ImportMeta interface for Vite...
+import * as echarts from 'echarts/core';
+import { CanvasRenderer } from 'echarts/renderers';
+import { LineChart } from 'echarts/charts';
+import {
+  GridComponent,
+  TooltipComponent,
+  TitleComponent,
+  LegendComponent,
+  DataZoomComponent,
+} from 'echarts/components';
+import VChart from 'vue-echarts';
+
+echarts.use([
+  CanvasRenderer,
+  LineChart,
+  GridComponent,
+  TooltipComponent,
+  TitleComponent,
+  LegendComponent,
+  DataZoomComponent,
+]);
+
+// Extend ImportMeta interface for Vite
 declare module 'vite/client' {
     interface ImportMetaEnv {
         readonly VITE_APP_NAME: string;
@@ -29,6 +51,7 @@ createInertiaApp({
         createApp({ render: () => h(App, props) })
             .use(plugin)
             .use(ZiggyVue)
+            .component('VChart', VChart) // Register VChart globally
             .mount(el);
     },
     progress: {
@@ -36,5 +59,5 @@ createInertiaApp({
     },
 });
 
-// This will set light / dark mode on page load...
+// Set light/dark mode on page load
 initializeTheme();
