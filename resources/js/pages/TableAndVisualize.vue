@@ -1,8 +1,11 @@
 <template>
   <AppLayout :breadcrumbs="breadcrumbs">
     <div class="p-4">
-      <h1 class="text-2xl font-bold mb-4">{{ props.title }}</h1>
-      <p class="text-gray-600 mb-4">{{ props.description }}</p>
+      <div class="p-2">
+        <div class="mb-4">
+          <apexchart type="line" :options="chartOptions" :series="series" :height="300"></apexchart>
+        </div>
+      </div>
 
       <!-- Flash Messages -->
       <div v-if="flash.success" class="rounded-xl border border-green-200 bg-green-50 p-3 text-green-700 mb-4">
@@ -18,13 +21,6 @@
 
       <!-- Component Details and Chart -->
       <div v-if="props.component">
-        <h2 class="text-xl font-semibold mb-4">Log Data for {{ props.component.name }}</h2>
-        <div v-if="(props.chart_data?.xAxis?.data ?? []).length > 0" class="relative flex-1 rounded-xl border border-gray-200 dark:border-gray-800 p-3 mb-4 h-96">
-          <Bar :chart-data="chartData" :options="chartOptions" />
-        </div>
-        <div v-else class="rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-yellow-700 mb-4">
-          No chart data available for this component.
-        </div>
         <div class="relative flex-1 rounded-xl border border-gray-200 dark:border-gray-800 p-3">
           <p class="text-lg font-semibold mb-2">Log Entries for {{ props.component.name }}</p>
           <Table>
@@ -61,6 +57,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref, computed, reactive, watch } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 import {
   Table,
@@ -71,7 +68,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { computed, watch } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 
 // Define interfaces
@@ -146,54 +142,118 @@ const breadcrumbs = computed(() => [
   { title: `Log Data for ${props.component?.name ?? 'Unknown Component'}`, href: '' },
 ]);
 
-// Chart data for Bar chart with all individual values
-const chartData = computed(() => {
-  if (!props.chart_data || !props.chart_data.xAxis.data.length) {
-    return {
-      labels: ['No Data'],
-      datasets: [{ label: props.component?.name ?? 'Component', backgroundColor: '#3b82f6', data: [0] }],
-    };
-  }
-  return {
-    labels: props.chart_data.xAxis.data,
-    datasets: props.chart_data.series.map(series => ({
-      label: series.name,
-      backgroundColor: '#3b82f6',
-      data: series.data,
-    })),
-  };
-});
-
-// Chart options
-const chartOptions = computed(() => ({
-  responsive: true,
-  maintainAspectRatio: false,
-  scales: {
-    x: {
-      title: { display: true, text: 'Timestamp' }, // Updated to reflect individual timestamps
+// Chart options using reactive for nested properties
+const chartOptions = reactive({
+  chart: {
+    id: 'log-data-chart',
+    toolbar: {
+      show: false,
     },
-    y: {
-      title: { display: true, text: 'Log Value' },
-      beginAtZero: true,
+    animations: {
+      enabled: true,
+      easing: 'easeinout',
+      speed: 800,
     },
   },
-  plugins: {
-    legend: { position: 'top' },
+  xaxis: {
+    type: 'datetime',
+    categories: computed(() => safeLogs.value
+      .map(log => log.LogTimestamp !== 'N/A' ? new Date(log.LogTimestamp).getTime() : null)
+      .filter(timestamp => timestamp !== null) as number[]),
     title: {
-      display: true,
-      text: `Log Data for ${props.component?.name ?? 'Component'}`,
-      align: 'center',
+      text: 'Timestamp',
     },
-    tooltip: {
-      callbacks: {
-        label: (context) => `${context.label}: ${context.raw ?? 'N/A'}`,
+    labels: {
+      rotate: -45,
+      hideOverlappingLabels: true,
+      formatter: (value: number) => {
+        const date = new Date(value);
+        const allSameDay = safeLogs.value.every(log => {
+          const logDate = new Date(log.LogTimestamp);
+          return logDate.toDateString() === date.toDateString();
+        });
+        return allSameDay
+          ? date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+          : date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
       },
     },
   },
-}));
+  yaxis: {
+    title: {
+      text: 'Log Value',
+    },
+    min: 0,
+  },
+  title: {
+    text: 'Log Data Trend',
+    align: 'center',
+    style: {
+      fontSize: '16px',
+    },
+  },
+  tooltip: {
+    x: {
+      formatter: (timestamp: number) => {
+        const date = new Date(timestamp);
+        const allSameDay = safeLogs.value.every(log => {
+          const logDate = new Date(log.LogTimestamp);
+          return logDate.toDateString() === date.toDateString();
+        });
+        return allSameDay
+          ? date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+          : date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      },
+    },
+    y: {
+      formatter: (value: number) => `${value} units`,
+    },
+  },
+  responsive: [
+    {
+      breakpoint: 640,
+      options: {
+        chart: {
+          width: '100%',
+        },
+        xaxis: {
+          labels: {
+            rotate: 0,
+          },
+        },
+      },
+    },
+  ],
+});
 
-// Debug chart data
-watch(() => props.chart_data, (newChartData) => {
-  console.log('Chart Data:', newChartData);
+// Chart series
+const series = ref([
+  {
+    name: computed(() => props.component?.name ?? 'Component'),
+    data: computed(() => safeLogs.value
+      .map(log => ({
+        x: log.LogTimestamp !== 'N/A' ? new Date(log.LogTimestamp).getTime() : null,
+        y: log.LogValue !== null ? log.LogValue : null,
+      }))
+      .filter(point => point.x !== null && point.y !== null)),
+  },
+]);
+
+// Watch for logs updates
+watch(() => props.logs, (newLogs) => {
+  console.log('Logs Data:', newLogs);
 }, { immediate: true });
 </script>
+
+<style scoped>
+/* Ensure chart container adapts to content */
+.apexcharts-canvas {
+  margin: 0 auto;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .apexcharts-canvas {
+    width: 100% !important;
+  }
+}
+</style>

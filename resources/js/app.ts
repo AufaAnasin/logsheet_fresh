@@ -6,6 +6,7 @@ import type { DefineComponent } from 'vue';
 import { createApp, h } from 'vue';
 import { ZiggyVue } from 'ziggy-js';
 import { initializeTheme } from './composables/useAppearance';
+import VueApexCharts from "vue3-apexcharts";
 
 // Import Chart.js and vue-chartjs
 import { Bar } from 'vue-chartjs';
@@ -43,6 +44,7 @@ createInertiaApp({
         createApp({ render: () => h(App, props) })
             .use(plugin)
             .use(ZiggyVue)
+            .use(VueApexCharts)
             .component('Bar', Bar) // Register Bar component
             .mount(el);
     },
