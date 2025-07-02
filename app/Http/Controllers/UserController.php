@@ -70,8 +70,10 @@ class UserController extends Controller
                 ->withErrors(['error' => 'Failed to create user. Please try again.']);
         }
 
+        // Redirect to /userlist
         return redirect()->route('users.index')->with('success', 'User created successfully.');
     }
+
     public function update(Request $request, $id)
     {
         $user = User::findOrFail($id);

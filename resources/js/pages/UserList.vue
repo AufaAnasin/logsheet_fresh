@@ -3,8 +3,16 @@
 
   <AppLayout :breadcrumbs="breadcrumbs">
     <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
+      <!-- Flash Messages -->
+      <div v-if="flash.success" class="rounded-xl border border-green-200 bg-green-50 p-3 text-green-700">
+        {{ flash.success }}
+      </div>
+      <div v-if="flash.error" class="rounded-xl border border-red-200 bg-red-50 p-3 text-red-700">
+        {{ flash.error }}
+      </div>
+
       <div class="flex justify-between items-center">
-        <Dialog>
+        <Dialog v-model:open="isCreateDialogOpen">
           <DialogTrigger as-child>
             <Button variant="outline" class="w-auto flex items-center gap-2">
               <Plus class="h-4 w-4" /> Create User
@@ -241,9 +249,9 @@
                 >
                   {{ item.value }}
                 </PaginationItem>
-              </template>
-              <PaginationEllipsis :index="4" />
-              <PaginationNext @click="currentPage = Math.min(totalPages, currentPage + 1)" :disabled="currentPage === totalPages" />
+            </template>
+            <PaginationEllipsis :index="4" />
+            <PaginationNext @click="currentPage = Math.min(totalPages, currentPage + 1)" :disabled="currentPage === totalPages" />
             </PaginationContent>
           </Pagination>
         </div>
@@ -253,7 +261,7 @@
 </template>
 
 <script setup lang="ts">
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head, useForm, usePage } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -313,6 +321,12 @@ interface User {
   department_name: string;
 }
 
+interface PageProps {
+  flash?: { success?: string; error?: string };
+  users: User[];
+  departments: { DepartmentID: number; name: string }[];
+}
+
 const props = defineProps<{
   users: User[];
   departments: { DepartmentID: number; name: string }[];
@@ -323,20 +337,26 @@ const breadcrumbs = [
 ];
 
 // Create User Form
+const isCreateDialogOpen = ref(false);
 const form = useForm({
   name: '',
   email: '',
-  role: null,
-  department_id: null,
+  role: null as string | null,
+  department_id: null as number | null,
 });
 
 const createUser = () => {
   form.post(route('users.store'), {
+    preserveState: true,
+    preserveScroll: true,
     onSuccess: () => {
       form.reset();
+      isCreateDialogOpen.value = false;
+      console.log('User created successfully, should redirect to /userlist');
     },
     onError: (errors) => {
-      console.log('Create Errors:', errors);
+      console.error('Create Errors:', errors);
+      isCreateDialogOpen.value = true; // Keep dialog open on error
     },
   });
 };
@@ -361,7 +381,7 @@ const openEditDialog = (user: User) => {
   editForm.department_id = props.departments.find(d => d.name === user.department_name)?.DepartmentID || null;
   setTimeout(() => {
     isEditDialogOpen.value = true;
-  }, 100); // Slight delay to avoid dropdown interference
+  }, 100);
 };
 
 const closeEditDialog = () => {
@@ -372,11 +392,13 @@ const closeEditDialog = () => {
 const updateUser = () => {
   if (editForm.id) {
     editForm.put(route('users.update', editForm.id), {
+      preserveState: true,
+      preserveScroll: true,
       onSuccess: () => {
         closeEditDialog();
       },
       onError: (errors) => {
-        console.log('Update Errors:', errors);
+        console.error('Update Errors:', errors);
       },
     });
   }
@@ -386,11 +408,11 @@ const updateUser = () => {
 const deleteForm = useForm({});
 
 const openDeleteDialog = (user: User) => {
-  editForm.id = user.id; // Store ID for deletion
-  editForm.name = user.name; // For display in dialog
+  editForm.id = user.id;
+  editForm.name = user.name;
   setTimeout(() => {
     isDeleteDialogOpen.value = true;
-  }, 100); // Slight delay to avoid dropdown interference
+  }, 100);
 };
 
 const closeDeleteDialog = () => {
@@ -401,11 +423,13 @@ const closeDeleteDialog = () => {
 const deleteUser = (id: string | null) => {
   if (id) {
     deleteForm.delete(route('users.destroy', id), {
+      preserveState: true,
+      preserveScroll: true,
       onSuccess: () => {
         closeDeleteDialog();
       },
       onError: (errors) => {
-        console.log('Delete Errors:', errors);
+        console.error('Delete Errors:', errors);
       },
     });
   }
@@ -436,8 +460,11 @@ const paginatedUsers = computed(() => {
   return filteredUsers.value.slice(start, end);
 });
 
-// Reset currentPage to 1 when searchQuery changes to avoid empty pages
 watch(searchQuery, () => {
   currentPage.value = 1;
 });
+
+// Access flash messages safely
+const page = usePage<{ props: PageProps }>();
+const flash = computed(() => page.props.flash || {});
 </script>
