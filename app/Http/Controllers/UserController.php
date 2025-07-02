@@ -32,7 +32,7 @@ class UserController extends Controller
 
     public function store(Request $request)
     {
-        // Validate input with stricter rules
+        // Validate input
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => [
@@ -49,7 +49,21 @@ class UserController extends Controller
             ],
         ]);
 
-        // Double-check email uniqueness for robustness
+        // Restrict DepartmentAdmin to only create Operator users in their own department
+        if ($request->user()->role === 'DepartmentAdmin') {
+            if ($validated['role'] !== 'Operator') {
+                return redirect()->back()
+                    ->withInput()
+                    ->withErrors(['role' => 'Admins can only create users with the Operator role.']);
+            }
+            if ($validated['department_id'] !== $request->user()->DepartmentID) {
+                return redirect()->back()
+                    ->withInput()
+                    ->withErrors(['department_id' => 'Admins can only create users in their own department.']);
+            }
+        }
+
+        // Double-check email uniqueness
         if (User::where('email', $validated['email'])->exists()) {
             return redirect()->back()
                 ->withInput()
@@ -72,6 +86,7 @@ class UserController extends Controller
 
         return redirect()->route('users.index')->with('success', 'User created successfully.');
     }
+
     public function update(Request $request, $id)
     {
         $user = User::findOrFail($id);
