@@ -43,7 +43,7 @@
               <div class="grid grid-cols-4 items-center gap-4">
                 <Label for="role" class="text-right">Role</Label>
                 <div class="col-span-3">
-                  <Select v-model="form.role">
+                  <Select v-model="form.role" :disabled="isRoleDisabled">
                     <SelectTrigger class="w-full">
                       <SelectValue placeholder="Select a Role" />
                     </SelectTrigger>
@@ -62,7 +62,7 @@
               <div class="grid grid-cols-4 items-center gap-4">
                 <Label for="department" class="text-right">Department</Label>
                 <div class="col-span-3">
-                  <Select v-model="form.department_id" class="w-full">
+                  <Select v-model="form.department_id" :disabled="isDepartmentDisabled" class="w-full">
                     <SelectTrigger class="w-full">
                       <SelectValue placeholder="Select a Department" />
                     </SelectTrigger>
@@ -249,9 +249,9 @@
                 >
                   {{ item.value }}
                 </PaginationItem>
-            </template>
-            <PaginationEllipsis :index="4" />
-            <PaginationNext @click="currentPage = Math.min(totalPages, currentPage + 1)" :disabled="currentPage === totalPages" />
+              </template>
+              <PaginationEllipsis :index="4" />
+              <PaginationNext @click="currentPage = Math.min(totalPages, currentPage + 1)" :disabled="currentPage === totalPages" />
             </PaginationContent>
           </Pagination>
         </div>
@@ -325,6 +325,7 @@ interface PageProps {
   flash?: { success?: string; error?: string };
   users: User[];
   departments: { DepartmentID: number; name: string }[];
+  auth: { user: { id: string; name: string; email: string; role: string; DepartmentID: number | null } | null };
 }
 
 const props = defineProps<{
@@ -336,14 +337,23 @@ const breadcrumbs = [
   { title: 'User List', href: '/userlist' },
 ];
 
+// Access authenticated user's role and department
+const page = usePage<{ props: PageProps }>();
+const userRole = computed(() => page.props.auth?.user?.role || '');
+const userDepartmentId = computed(() => page.props.auth?.user?.DepartmentID || null);
+
 // Create User Form
 const isCreateDialogOpen = ref(false);
 const form = useForm({
   name: '',
   email: '',
-  role: null as string | null,
-  department_id: null as number | null,
+  role: userRole.value === 'DepartmentAdmin' ? 'Operator' : null as string | null,
+  department_id: userRole.value === 'DepartmentAdmin' ? userDepartmentId.value : null as number | null,
 });
+
+// Disable role and department inputs for DepartmentAdmin
+const isRoleDisabled = computed(() => userRole.value === 'DepartmentAdmin');
+const isDepartmentDisabled = computed(() => userRole.value === 'DepartmentAdmin');
 
 const createUser = () => {
   form.post(route('users.store'), {
@@ -356,7 +366,7 @@ const createUser = () => {
     },
     onError: (errors) => {
       console.error('Create Errors:', errors);
-      isCreateDialogOpen.value = true; // Keep dialog open on error
+      isCreateDialogOpen.value = true;
     },
   });
 };
@@ -465,6 +475,5 @@ watch(searchQuery, () => {
 });
 
 // Access flash messages safely
-const page = usePage<{ props: PageProps }>();
 const flash = computed(() => page.props.flash || {});
 </script>
