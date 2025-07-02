@@ -77,7 +77,7 @@
 
       // Validate that all inputs are valid numbers or empty
       const invalidInputs = Object.entries(logInputs.value).filter(
-          ([_, value]) => value !== '' && isNaN(parseFloat(value))
+          ([, value]) => value !== '' && isNaN(parseFloat(value))
       );
 
       if (invalidInputs.length > 0) {
@@ -86,7 +86,7 @@
       }
 
       const logData = Object.entries(logInputs.value)
-          .filter(([_, value]) => value !== '') // Only include non-empty inputs
+          .filter(([, value]) => value !== '') // Only include non-empty inputs
           .map(([componentId, logMessage]) => ({
               component_id: parseInt(componentId),
               log_message: logMessage.toString(), // Ensure string type
