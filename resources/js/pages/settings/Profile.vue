@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 
-import DeleteUser from '@/components/DeleteUser.vue';
+// import DeleteUser from '@/components/DeleteUser.vue';
 import HeadingSmall from '@/components/HeadingSmall.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
@@ -11,15 +11,6 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { type BreadcrumbItem, type SharedData, type User } from '@/types';
 
-import {
-    Select,
-    SelectContent,
-    SelectGroup,
-    SelectItem,
-    SelectLabel,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select'
 
 interface Props {
     mustVerifyEmail: boolean;
@@ -74,24 +65,6 @@ const submit = () => {
                             autocomplete="username" placeholder="Email address" />
                         <InputError class="mt-2" :message="form.errors.email" />
                     </div>
-                    <div class="grid gap-2">
-                        <Label for="department">Department</Label>
-                        <div class="mt-1 block w-full">
-                            <Select>
-                                <SelectTrigger class="w-full">
-                                    <SelectValue placeholder="Select a fruit" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectGroup>
-                                        <SelectLabel>Fruits</SelectLabel>
-                                        <SelectItem value="apple">
-                                            Apple
-                                        </SelectItem>
-                                    </SelectGroup>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
 
                     <div v-if="mustVerifyEmail && !user.email_verified_at">
                         <p class="-mt-4 text-sm text-muted-foreground">
@@ -118,7 +91,7 @@ const submit = () => {
                 </form>
             </div>
 
-            <DeleteUser />
+            <!-- <DeleteUser /> -->
         </SettingsLayout>
     </AppLayout>
 </template>
