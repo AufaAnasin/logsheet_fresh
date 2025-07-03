@@ -155,6 +155,12 @@
                         class="w-full"
                         @input="handleNumericInput(component.ComponentID, $event.target.value)"
                     />
+                    <Input
+                        type="text"
+                        inputmode="numeric"
+                        placeholder="Give notes..."
+                        class="w-full"
+                    />
                 </div>
                 <Button @click="submitLogData" :disabled="Object.values(logInputs).every(val => !val.trim())">
                     Submit Log Data

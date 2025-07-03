@@ -25,12 +25,13 @@
               <TableHead class="w-[100px]">ID</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Department</TableHead>
+              <TableHead>Created At (WIB)</TableHead>
               <TableHead>Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             <TableRow v-if="filteredAreas.length === 0">
-              <TableCell colspan="4" class="text-center">
+              <TableCell colspan="5" class="text-center">
                 {{ userDepartmentId ? 'No areas available for your department.' : 'No department assigned.' }}
               </TableCell>
             </TableRow>
@@ -38,6 +39,7 @@
               <TableCell class="font-medium">{{ area.AreaID }}</TableCell>
               <TableCell>{{ area.name }}</TableCell>
               <TableCell>{{ area.department_name }}</TableCell>
+              <TableCell>{{ formatTimestamp(area.created_at) }}</TableCell>
               <TableCell>
                 <Button @click="navigateToComponents(area.AreaID)">
                   <MoveDiagonal class="w-4 h-4" />
@@ -67,6 +69,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { computed } from 'vue';
+import { formatInTimeZone } from 'date-fns-tz';
 
 // Define interfaces
 interface Area {
@@ -75,6 +78,7 @@ interface Area {
   DepartmentID: number;
   department_name: string;
   desc: string | null;
+  created_at: string | null; // Timestamp field (e.g., '2025-07-03 02:27:35')
 }
 
 interface Flash {
@@ -96,7 +100,7 @@ const props = defineProps<{
 
 // Get user and department ID from page props
 const page = usePage<{ props: PageProps }>();
-const user = computed(() => page.props.user);
+const user = computed(() => page.props.user ?? { DepartmentID: null, role: null });
 const userDepartmentId = computed(() => user.value?.DepartmentID ?? null);
 const userRole = computed(() => user.value?.role ?? null);
 
@@ -124,6 +128,18 @@ const flash = computed(() => {
 const breadcrumbs = [
   { title: 'Analytics', href: '/analytics' },
 ];
+
+// Format timestamp to WIB using date-fns-tz
+const formatTimestamp = (timestamp: string | null) => {
+  if (!timestamp) return 'N/A';
+  try {
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return 'Invalid Date';
+    return formatInTimeZone(date, 'Asia/Jakarta', 'd MMM yyyy, HH:mm:ss');
+  } catch {
+    return 'Invalid Date';
+  }
+};
 
 // Navigate to components insights page
 const navigateToComponents = (areaId: number) => {
