@@ -144,6 +144,6 @@ const formatTimestamp = (timestamp: string | null) => {
 // Navigate to components insights page
 const navigateToComponents = (areaId: number) => {
   console.log('Navigating to components for AreaID:', areaId);
-  router.visit(`/analytics/components/${areaId}`);
+  router.visit(`/visualizeandtable/${areaId}`);
 };
 </script>

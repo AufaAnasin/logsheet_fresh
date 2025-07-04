@@ -9,6 +9,7 @@ use App\Models\Area;
 use App\Models\Component;
 use App\Models\LogData;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class LogdataController extends Controller
 {
@@ -33,6 +34,7 @@ class LogdataController extends Controller
                 'DepartmentID' => $area->DepartmentID,
                 'department_name' => $area->department ? $area->department->name : 'No Department',
                 'desc' => $area->desc,
+                'created_at' => $area->created_at ? $area->created_at->format('Y-m-d H:i:s') : null,
             ];
         });
 
@@ -107,7 +109,7 @@ class LogdataController extends Controller
 
         if (!$component) {
             Log::warning("Component not found for ID: {$componentId}");
-            return Inertia::render('TableAndVisualize', [
+            return Inertia::render('ComponentsInsight', [
                 'title' => 'Visualize and Table',
                 'description' => 'This page allows you to visualize and table all log data.',
                 'component' => null,
@@ -126,7 +128,7 @@ class LogdataController extends Controller
 
         if ($user->role !== 'SuperUser' && $component->area->DepartmentID !== $user->DepartmentID) {
             Log::warning("Unauthorized access to component ID: {$componentId} by user ID: {$user->id}");
-            return Inertia::render('TableAndVisualize', [
+            return Inertia::render('ComponentsInsight', [
                 'title' => 'Visualize and Table',
                 'description' => 'This page allows you to visualize and table all log data.',
                 'component' => null,
@@ -143,34 +145,65 @@ class LogdataController extends Controller
             ]);
         }
 
-        // Fetch all logs for the table
-        $logs = $component->logs->map(function ($log) {
+        // Build query for logs
+        $logsQuery = $component->logs()->with('operator');
+
+        // Apply date filters
+        $filter = $request->query('filter');
+        if ($filter === 'yearly') {
+            $year = $request->query('year', Carbon::now()->year);
+            $logsQuery->whereYear('LogTimestamp', $year);
+        } elseif ($filter === 'monthly') {
+            $year = $request->query('year', Carbon::now()->year);
+            $month = $request->query('month', Carbon::now()->month);
+            $logsQuery->whereYear('LogTimestamp', $year)->whereMonth('LogTimestamp', $month);
+        } elseif ($filter === 'daily') {
+            $day = $request->query('day', Carbon::now()->toDateString());
+            $logsQuery->whereDate('LogTimestamp', $day);
+        }
+
+        // Fetch logs
+        $logs = $logsQuery->get()->map(function ($log) {
             return [
                 'LogID' => $log->LogID,
                 'ComponentID' => $log->ComponentID,
                 'LogValue' => $log->LogValue,
-                'LogTimestamp' => $log->LogTimestamp ? $log->LogTimestamp->format('Y-m-d H:i:s') : 'N/A',
+                'LogTimestamp' => $log->LogTimestamp ? $log->LogTimestamp->format('Y-m-d H:i:s') : null,
                 'OperatorName' => $log->operator ? $log->operator->name : 'Unknown',
             ];
         })->sortByDesc('LogTimestamp')->values();
 
-        // Fetch all logs for the chart with individual values
-        $chartData = $component->logs->whereNotNull('LogValue')->whereNotNull('LogTimestamp')
-            ->map(function ($log) {
-                return [
-                    'date' => $log->LogTimestamp->format('Y-m-d H:i:s'),
-                    'value' => $log->LogValue,
-                ];
-            })->sortBy('date')->values();
+        // Fetch chart data
+        $chartQuery = $component->logs()->whereNotNull('LogValue')->whereNotNull('LogTimestamp');
+        if ($filter === 'yearly') {
+            $year = $request->query('year', Carbon::now()->year);
+            $chartQuery->whereYear('LogTimestamp', $year);
+        } elseif ($filter === 'monthly') {
+            $year = $request->query('year', Carbon::now()->year);
+            $month = $request->query('month', Carbon::now()->month);
+            $chartQuery->whereYear('LogTimestamp', $year)->whereMonth('LogTimestamp', $month);
+        } elseif ($filter === 'daily') {
+            $day = $request->query('day', Carbon::now()->toDateString());
+            $chartQuery->whereDate('LogTimestamp', $day);
+        }
+
+        $chartData = $chartQuery->get()->map(function ($log) {
+            return [
+                'date' => $log->LogTimestamp ? $log->LogTimestamp->format('Y-m-d H:i:s') : 'N/A',
+                'value' => $log->LogValue,
+            ];
+        })->sortBy('date')->values();
 
         $chartDataArray = $chartData->isEmpty() ? [['date' => 'No Data', 'value' => 0]] : $chartData->all();
 
         Log::info("Chart data for component ID: {$componentId}", [
             'chart_data' => $chartDataArray,
             'logs_count' => $logs->count(),
+            'filter' => $filter,
+            'query_params' => $request->query(),
         ]);
 
-        return Inertia::render('TableAndVisualize', [
+        return Inertia::render('ComponentsInsight', [
             'title' => 'Visualize and Table',
             'description' => 'This page allows you to visualize and table all log data.',
             'component' => [
@@ -189,7 +222,7 @@ class LogdataController extends Controller
                 'series' => [
                     [
                         'name' => $component->name,
-                        'type' => 'bar',
+                        'type' => 'line', // Default to line chart
                         'data' => array_column($chartDataArray, 'value'),
                     ],
                 ],
