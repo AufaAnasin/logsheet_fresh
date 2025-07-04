@@ -9,6 +9,7 @@ use App\Models\Area;
 use App\Models\Component;
 use App\Models\LogData;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class LogdataController extends Controller
 {
@@ -36,6 +37,12 @@ class LogdataController extends Controller
             ];
         });
 
+        Log::info('Analytics response', [
+            'user_id' => $user->id,
+            'areas_count' => $areas->count(),
+            'areas' => $areas->toArray(),
+        ]);
+
         return Inertia::render('Analytics', [
             'areas' => $areas,
             'user' => [
@@ -51,7 +58,8 @@ class LogdataController extends Controller
         $area = Area::find($areaId);
 
         if (!$area) {
-            return Inertia::render('ComponentsInsight', [
+            Log::warning("Area not found for ID: {$areaId}", ['user_id' => $user->id]);
+            return Inertia::render('Components', [
                 'components' => [],
                 'area' => null,
                 'user' => [
@@ -63,7 +71,8 @@ class LogdataController extends Controller
         }
 
         if ($user->role !== 'SuperUser' && $area->DepartmentID !== $user->DepartmentID) {
-            return Inertia::render('ComponentsInsight', [
+            Log::warning("Unauthorized access to area ID: {$areaId} by user ID: {$user->id}");
+            return Inertia::render('Components', [
                 'components' => [],
                 'area' => null,
                 'user' => [
@@ -86,7 +95,18 @@ class LogdataController extends Controller
                 ];
             });
 
-        return Inertia::render('ComponentsInsight', [
+        Log::info("Components insights for AreaID: {$areaId}", [
+            'user_id' => $user->id,
+            'components_count' => $components->count(),
+            'components' => $components->toArray(),
+            'area' => [
+                'AreaID' => $area->AreaID,
+                'name' => $area->name,
+                'DepartmentID' => $area->DepartmentID,
+            ],
+        ]);
+
+        return Inertia::render('Components', [
             'components' => $components,
             'area' => [
                 'AreaID' => $area->AreaID,
@@ -106,7 +126,7 @@ class LogdataController extends Controller
         $component = Component::with(['area', 'logs.operator'])->find($componentId);
 
         if (!$component) {
-            Log::warning("Component not found for ID: {$componentId}");
+            Log::warning("Component not found for ID: {$componentId}", ['user_id' => $user->id]);
             return Inertia::render('TableAndVisualize', [
                 'title' => 'Visualize and Table',
                 'description' => 'This page allows you to visualize and table all log data.',
@@ -143,8 +163,25 @@ class LogdataController extends Controller
             ]);
         }
 
-        // Fetch all logs for the table
-        $logs = $component->logs->map(function ($log) {
+        // Build query for logs
+        $logsQuery = $component->logs()->with('operator');
+
+        // Apply date filters
+        $filter = $request->query('filter');
+        if ($filter === 'yearly') {
+            $year = $request->query('year', Carbon::now()->year);
+            $logsQuery->whereYear('LogTimestamp', $year);
+        } elseif ($filter === 'monthly') {
+            $year = $request->query('year', Carbon::now()->year);
+            $month = $request->query('month', Carbon::now()->month);
+            $logsQuery->whereYear('LogTimestamp', $year)->whereMonth('LogTimestamp', $month);
+        } elseif ($filter === 'daily') {
+            $day = $request->query('day', Carbon::now()->toDateString());
+            $logsQuery->whereDate('LogTimestamp', $day);
+        }
+
+        // Fetch logs
+        $logs = $logsQuery->get()->map(function ($log) {
             return [
                 'LogID' => $log->LogID,
                 'ComponentID' => $log->ComponentID,
@@ -154,20 +191,35 @@ class LogdataController extends Controller
             ];
         })->sortByDesc('LogTimestamp')->values();
 
-        // Fetch all logs for the chart with individual values
-        $chartData = $component->logs->whereNotNull('LogValue')->whereNotNull('LogTimestamp')
-            ->map(function ($log) {
-                return [
-                    'date' => $log->LogTimestamp->format('Y-m-d H:i:s'),
-                    'value' => $log->LogValue,
-                ];
-            })->sortBy('date')->values();
+        // Fetch chart data
+        $chartQuery = $component->logs()->whereNotNull('LogValue')->whereNotNull('LogTimestamp');
+        if ($filter === 'yearly') {
+            $year = $request->query('year', Carbon::now()->year);
+            $chartQuery->whereYear('LogTimestamp', $year);
+        } elseif ($filter === 'monthly') {
+            $year = $request->query('year', Carbon::now()->year);
+            $month = $request->query('month', Carbon::now()->month);
+            $chartQuery->whereYear('LogTimestamp', $year)->whereMonth('LogTimestamp', $month);
+        } elseif ($filter === 'daily') {
+            $day = $request->query('day', Carbon::now()->toDateString());
+            $chartQuery->whereDate('LogTimestamp', $day);
+        }
+
+        $chartData = $chartQuery->get()->map(function ($log) {
+            return [
+                'date' => $log->LogTimestamp ? $log->LogTimestamp->format('Y-m-d H:i:s') : 'N/A',
+                'value' => $log->LogValue,
+            ];
+        })->sortBy('date')->values();
 
         $chartDataArray = $chartData->isEmpty() ? [['date' => 'No Data', 'value' => 0]] : $chartData->all();
 
         Log::info("Chart data for component ID: {$componentId}", [
+            'user_id' => $user->id,
             'chart_data' => $chartDataArray,
             'logs_count' => $logs->count(),
+            'filter' => $filter,
+            'query_params' => $request->query(),
         ]);
 
         return Inertia::render('TableAndVisualize', [
@@ -189,7 +241,7 @@ class LogdataController extends Controller
                 'series' => [
                     [
                         'name' => $component->name,
-                        'type' => 'bar',
+                        'type' => 'line',
                         'data' => array_column($chartDataArray, 'value'),
                     ],
                 ],
