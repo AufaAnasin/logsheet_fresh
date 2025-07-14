@@ -15,6 +15,13 @@
         No department assigned. Please contact an administrator to assign a department.
       </div>
 
+      <!-- PDF Download Button -->
+      <div class="mb-4" v-if="props.area">
+        <Button as="a" :href="route('generateAreaReport', { areaId: props.area.AreaID })" class="bg-blue-500 hover:bg-blue-700 text-white">
+          Print All Logs
+        </Button>
+      </div>
+
       <!-- Components Table -->
       <div class="relative flex-1 rounded-xl border border-gray-200 dark:border-gray-800 p-3">
         <p class="text-lg font-semibold mb-2">List of Components for {{ areaName }}</p>

@@ -15,6 +15,7 @@ Route::get('/', function () {
 Route::middleware(['auth', 'verified', 'non_operator'])->group(function () {
     Route::get('/dashboard', [DepartmentController::class, 'index'])->name('dashboard');
     Route::get('/analytics', [LogdataController::class, 'analytics'])->name('analytics');
+    Route::get('/analytics/components/{areaId}/area-report', [LogdataController::class, 'generateAreaReport'])->name('generateAreaReport');
     Route::get('/analytics/components/{area}', [LogdataController::class, 'componentsInsights'])->name('components.insights');
     Route::get('/userlist', [UserController::class, 'index'])->name('users.index');
     Route::post('/userlist', [UserController::class, 'store'])->name('users.store');

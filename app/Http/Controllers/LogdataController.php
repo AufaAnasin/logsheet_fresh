@@ -10,6 +10,7 @@ use App\Models\Component;
 use App\Models\LogData;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class LogdataController extends Controller
 {
@@ -251,5 +252,44 @@ class LogdataController extends Controller
                 'role' => $user->role,
             ],
         ]);
+    }
+    public function generateAreaReport(Request $request, $areaId)
+    {
+        $user = $request->user();
+        $area = Area::with('department')->find($areaId);
+
+        if (!$area) {
+            Log::warning("Area not found for ID: {$areaId}", ['user_id' => $user->id]);
+            return redirect()->route('components', ['areaId' => $areaId])
+                ->with('flash', ['error' => 'Area not found.']);
+        }
+
+        if ($user->role !== 'SuperUser' && $area->DepartmentID !== $user->DepartmentID) {
+            Log::warning("Unauthorized access to area ID: {$areaId} by user ID: {$user->id}");
+            return redirect()->route('components', ['areaId' => $areaId])
+                ->with('flash', ['error' => 'Unauthorized access to this area.']);
+        }
+
+        $components = Component::with(['logs.operator'])
+            ->where('AreaID', $area->AreaID)
+            ->get();
+
+        Log::info("Generating area PDF report for AreaID: {$areaId}", [
+            'user_id' => $user->id,
+            'components_count' => $components->count(),
+            'area' => [
+                'AreaID' => $area->AreaID,
+                'name' => $area->name,
+                'DepartmentID' => $area->DepartmentID,
+            ],
+        ]);
+
+        $pdf = Pdf::loadView('reports.logdata_report', [
+            'area' => $area,
+            'components' => $components,
+            'user' => $user,
+        ]);
+
+        return $pdf->download('logdata_report' . $area->AreaID . '_' . now()->format('Ymd_His') . '.pdf');
     }
 }
