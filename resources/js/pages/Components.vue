@@ -17,7 +17,12 @@
 
       <!-- PDF Download Button -->
       <div class="mb-4" v-if="props.area">
-        <Button as="a" :href="route('generateAreaReport', { areaId: props.area.AreaID })" class="bg-blue-500 hover:bg-blue-700 text-white">
+        <Button
+          as="a"
+          :href="route('generateAreaReport', { areaId: props.area.AreaID })"
+          class="bg-white text-black hover:bg-gray-200 hover:text-black transition-colors"
+        >
+        <Printer />
           Print All Logs
         </Button>
       </div>
@@ -60,7 +65,7 @@
 </template>
 
 <script setup lang="ts">
-import { MoveDiagonal } from 'lucide-vue-next';
+import { MoveDiagonal, Printer } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import { router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
