@@ -47,7 +47,7 @@ interface Department {
     desc: string | null;
 }
 
-const props = defineProps<{
+defineProps<{
     departments: Department[];
     userRole: string | null;
     showTableOnly?: boolean;
