@@ -11,12 +11,93 @@ use App\Models\LogData;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Auth;
 
 class LogdataController extends Controller
 {
     public function logData(): Response
     {
-        return Inertia::render('Logdata');
+        $user = Auth::user();
+        $query = Area::with('department');
+
+        if ($user->role !== 'SuperUser') {
+            $query->where('DepartmentID', $user->DepartmentID);
+        }
+
+        $areas = $query->get()->map(function ($area) {
+            return [
+                'AreaID' => $area->AreaID,
+                'name' => $area->name,
+                'DepartmentID' => $area->DepartmentID,
+                'department_name' => $area->department ? $area->department->name : 'No Department',
+                'desc' => $area->desc,
+            ];
+        });
+
+        $components = Component::whereIn('AreaID', $areas->pluck('AreaID'))->get()->map(function ($component) {
+            return [
+                'ComponentID' => $component->ComponentID,
+                'name' => $component->name,
+                'AreaID' => $component->AreaID,
+                'area_name' => $component->area ? $component->area->name : 'No Area',
+                'desc' => $component->desc,
+            ];
+        });
+
+        return Inertia::render('Logdata', [
+            'areas' => $areas,
+            'components' => $components,
+            'userRole' => $user->role,
+        ]);
+    }
+
+    public function store(Request $request)
+    {
+        $user = Auth::user();
+
+        // Validate request
+        $validated = $request->validate([
+            'area_id' => 'required|exists:areas,AreaID',
+            'logs' => 'required|array|min:1',
+            'logs.*.component_id' => 'required|exists:components,ComponentID',
+            'logs.*.log_message' => 'required|string|regex:/^-?\d*\.?\d*$/',
+            'logs.*.notes' => 'nullable|string|max:255',
+        ]);
+
+        // Verify area access
+        $area = Area::find($validated['area_id']);
+        if ($user->role !== 'SuperUser' && $area->DepartmentID !== $user->DepartmentID) {
+            Log::warning("Unauthorized attempt to log data for AreaID: {$validated['area_id']}", ['user_id' => $user->id]);
+            return redirect()->route('logdata')->with('flash', ['error' => 'Unauthorized access to this area.']);
+        }
+
+        // Create log entries
+        $logsCreated = 0;
+        foreach ($validated['logs'] as $log) {
+            $component = Component::find($log['component_id']);
+            if ($component && $component->AreaID === $validated['area_id']) {
+                LogData::create([
+                    'ComponentID' => $log['component_id'],
+                    'OperatorID' => $user->id,
+                    'LogValue' => $log['log_message'],
+                    'LogTimestamp' => now(),
+                    'Notes' => $log['notes'],
+                ]);
+                $logsCreated++;
+            }
+        }
+
+        Log::info("Log data stored for AreaID: {$validated['area_id']}", [
+            'user_id' => $user->id,
+            'logs_count' => $logsCreated,
+            'logs' => $validated['logs'],
+        ]);
+
+        if ($logsCreated === 0) {
+            return redirect()->route('logdata')->with('flash', ['error' => 'No valid logs were created.']);
+        }
+
+        return redirect()->route('logdata')->with('flash', ['success' => 'Log data submitted successfully.']);
     }
 
     public function analytics(Request $request): Response
@@ -189,6 +270,7 @@ class LogdataController extends Controller
                 'LogValue' => $log->LogValue,
                 'LogTimestamp' => $log->LogTimestamp ? $log->LogTimestamp->format('Y-m-d H:i:s') : 'N/A',
                 'OperatorName' => $log->operator ? $log->operator->name : 'Unknown',
+                'Notes' => $log->Notes,
             ];
         })->sortByDesc('LogTimestamp')->values();
 
@@ -253,6 +335,7 @@ class LogdataController extends Controller
             ],
         ]);
     }
+
     public function generateAreaReport(Request $request, $areaId)
     {
         $user = $request->user();
@@ -288,8 +371,9 @@ class LogdataController extends Controller
             'area' => $area,
             'components' => $components,
             'user' => $user,
+            'notes' => $user->notes,
         ]);
 
-        return $pdf->download('logdata_report' . $area->AreaID . '_' . now()->format('Ymd_His') . '.pdf');
+        return $pdf->download('logdata_report_area_' . $area->AreaID . '_' . now()->format('Ymd_His') . '.pdf');
     }
 }

@@ -80,6 +80,7 @@
                         <th style="width: 50px;">Value</th>
                         <th style="width: 90px;">Timestamp</th>
                         <th style="width: 80px;">Operator</th>
+                        <th style="width: 80px;">Notes</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -89,6 +90,7 @@
                             <td>{{ $log->LogValue }}</td>
                             <td>{{ $log->LogTimestamp->format('Y-m-d H:i') }}</td>
                             <td>{{ $log->operator->name ?? 'Unknown' }}</td>
+                            <td>{{ $log->operator->notes ?? 'No Notes' }}</td>
                         </tr>
                     @empty
                         <tr>

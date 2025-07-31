@@ -119,6 +119,7 @@ class ComponentController extends Controller
             'logs' => 'required|array',
             'logs.*.component_id' => 'required|exists:components,ComponentID',
             'logs.*.log_message' => 'required|string',
+            'logs.*.notes' => 'nullable|string', // <-- Add this line
         ]);
 
         try {
@@ -126,9 +127,9 @@ class ComponentController extends Controller
                 \App\Models\LogData::create([
                     'OperatorID' => Auth::user()->id,
                     'ComponentID' => $log['component_id'],
-                    'LogValue' => $log['log_message'], // Map log_message to LogValue
-                    'LogTimestamp' => now(),          // Set current time
-                    'Notes' => null,                  // Default to null if not provided
+                    'LogValue' => $log['log_message'],
+                    'LogTimestamp' => now(),
+                    'Notes' => $log['notes'] ?? null, // <-- Use notes from request if present
                 ]);
             }
 
