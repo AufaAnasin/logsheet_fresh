@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Auth;
 
 class ComponentController extends Controller
 {
+    
     public function store(Request $request)
     {
         \Illuminate\Support\Facades\Log::info('Component store request:', $request->all());

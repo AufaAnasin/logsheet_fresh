@@ -2,16 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Inertia\Inertia;
-use Inertia\Response;
 use App\Models\Area;
 use App\Models\Component;
 use App\Models\LogData;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class LogdataController extends Controller
 {
@@ -34,17 +35,32 @@ class LogdataController extends Controller
             ];
         });
 
-        $components = Component::whereIn('AreaID', $areas->pluck('AreaID'))->get()->map(function ($component) {
+        $componentQuery = Component::with('area.department');
+        if ($user->role !== 'SuperUser') {
+            $componentQuery->whereHas('area', function ($q) use ($user) {
+                $q->where('DepartmentID', $user->DepartmentID);
+            });
+        }
+
+        $components = $componentQuery->get()->map(function ($component) {
             return [
                 'ComponentID' => $component->ComponentID,
                 'name' => $component->name,
                 'AreaID' => $component->AreaID,
                 'area_name' => $component->area ? $component->area->name : 'No Area',
+                'department_name' => $component->area && $component->area->department ? $component->area->department->name : 'No Department',
                 'desc' => $component->desc,
             ];
         });
 
-        return Inertia::render('Logdata', [
+        Log::info('logData response for visualization', [
+            'user_id' => $user->id,
+            'areas_count' => $areas->count(),
+            'components_count' => $components->count(),
+            'userRole' => $user->role,
+        ]);
+
+        return Inertia::render('DataVisualization', [
             'areas' => $areas,
             'components' => $components,
             'userRole' => $user->role,
@@ -375,5 +391,98 @@ class LogdataController extends Controller
         ]);
 
         return $pdf->download('logdata_report_area_' . $area->AreaID . '_' . now()->format('Ymd_His') . '.pdf');
+    }
+
+    public function visualizationData(Request $request)
+    {
+        $user = $request->user();
+        $validated = $request->validate([
+            'charts' => 'required|array',
+            'charts.*.id' => 'required|integer',
+            'charts.*.component_ids' => 'required|array|max:10',
+            'charts.*.component_ids.*' => 'required|exists:components,ComponentID',
+            'charts.*.area_ids' => 'required|array|max:5',
+            'charts.*.area_ids.*' => 'required|exists:areas,AreaID',
+            'charts.*.date_range' => 'required|array|size:2',
+            'charts.*.date_range.*' => 'required|date',
+        ]);
+    
+        // Verify component and area access
+        $componentIds = collect($validated['charts'])->pluck('component_ids')->flatten()->unique();
+        $areaIds = collect($validated['charts'])->pluck('area_ids')->flatten()->unique();
+        $components = Component::whereIn('ComponentID', $componentIds)
+            ->with('area.department')
+            ->get();
+        $areas = Area::whereIn('AreaID', $areaIds)->get();
+    
+        if ($components->count() !== $componentIds->count() || $areas->count() !== $areaIds->count()) {
+            Log::warning("Invalid component or area IDs provided", [
+                'user_id' => $user->id,
+                'component_ids' => $componentIds->toArray(),
+                'area_ids' => $areaIds->toArray(),
+            ]);
+            return response()->json(['error' => 'One or more component or area IDs are invalid.'], 422);
+        }
+    
+        foreach ($components as $component) {
+            if ($user->role !== 'SuperUser' && $component->area->DepartmentID !== $user->DepartmentID) {
+                Log::warning("Unauthorized access to component ID: {$component->ComponentID} by user ID: {$user->id}");
+                return response()->json(['error' => 'Unauthorized access to one or more components.'], 403);
+            }
+        }
+    
+        $results = [];
+        foreach ($validated['charts'] as $chart) {
+            $startDate = $chart['date_range'][0];
+            $endDate = Carbon::parse($chart['date_range'][1])->endOfDay()->toDateTimeString();
+    
+            $query = LogData::whereIn('ComponentID', $chart['component_ids'])
+                ->whereHas('component', function ($q) use ($chart, $user) {
+                    $q->whereIn('AreaID', $chart['area_ids']);
+                    if ($user->role !== 'SuperUser') {
+                        $q->whereHas('area', fn($q) => $q->where('DepartmentID', $user->DepartmentID));
+                    }
+                })
+                ->whereBetween('LogTimestamp', [$startDate, $endDate])
+                ->join('components', 'log_data.ComponentID', '=', 'components.ComponentID')
+                ->select(
+                    'components.ComponentID as component_id',
+                    'components.name as component_name',
+                    'log_data.LogValue as value',
+                    'log_data.LogTimestamp as timestamp',
+                    'log_data.Notes as notes'
+                )
+                ->orderBy('log_data.LogTimestamp');
+    
+            $data = $query->get()->map(function ($item) {
+                return [
+                    'component_id' => $item->component_id,
+                    'component_name' => $item->component_name,
+                    'timestamp' => $item->timestamp,
+                    'value' => (float) $item->value,
+                    'notes' => $item->notes,
+                ];
+            })->toArray();
+    
+            if (empty($data)) {
+                Log::info("No log data found for chart", [
+                    'chart_id' => $chart['id'],
+                    'component_ids' => $chart['component_ids'],
+                    'area_ids' => $chart['area_ids'],
+                    'date_range' => [$startDate, $endDate],
+                ]);
+            }
+    
+            $results[$chart['id']] = $data;
+        }
+    
+        Log::info("Visualization data fetched", [
+            'user_id' => $user->id,
+            'charts_count' => count($validated['charts']),
+            'component_ids' => $componentIds->toArray(),
+            'area_ids' => $areaIds->toArray(),
+        ]);
+    
+        return response()->json($results);
     }
 }
