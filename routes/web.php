@@ -23,6 +23,10 @@ Route::middleware(['auth', 'verified', 'non_operator'])->group(function () {
     Route::put('/userlist/{id}', [UserController::class, 'update'])->name('users.update');
     Route::delete('/userlist/{id}', [UserController::class, 'destroy'])->name('users.destroy');
     Route::get('/visualizeandtable/{componentId}', [LogdataController::class, 'visualizeandtable'])->name('visualizeandtable');
+    
+    // Visualization routes for non-operator users (SuperUser, Admin)
+    Route::get('/visualization', [LogdataController::class, 'logData'])->name('visualization');
+    Route::post('/visualization/data', [LogdataController::class, 'visualizationData'])->middleware('api')->name('visualization.data');
 
     Route::post('/departments', [DepartmentController::class, 'store'])->name('departments.store');
     Route::put('/departments/{department}', [DepartmentController::class, 'update'])->name('departments.update');
@@ -32,18 +36,17 @@ Route::middleware(['auth', 'verified', 'non_operator'])->group(function () {
     Route::put('/areas/{area}', [AreaController::class, 'update'])->name('areas.update');
     Route::delete('/areas/{area}', [AreaController::class, 'destroy'])->name('areas.destroy');
 
-
-    Route::get('/log-configurations', [LogConfigurationController::class, 'index']);
-    Route::post('/log-configurations', [LogConfigurationController::class, 'store']); // Untuk create baru
-    Route::put('/log-configurations/{id}', [LogConfigurationController::class, 'update']);
+    Route::get('/log-configurations', [LogConfigurationController::class, 'index'])->name('log-configurations.index');
+    Route::post('/log-configurations', [LogConfigurationController::class, 'store'])->name('log-configurations.store');
+    Route::put('/log-configurations/{id}', [LogConfigurationController::class, 'update'])->name('log-configurations.update');
 
     Route::get('/components', function () {
         return redirect()->route('dashboard');
-    });
+    })->name('components.redirect');
 
-    Route::post('/components', [ComponentController::class, 'store']);
-    Route::put('/components/{component}', [ComponentController::class, 'update']);
-    Route::delete('/components/{component}', [ComponentController::class, 'destroy']);
+    Route::post('/components', [ComponentController::class, 'store'])->name('components.store');
+    Route::put('/components/{component}', [ComponentController::class, 'update'])->name('components.update');
+    Route::delete('/components/{component}', [ComponentController::class, 'destroy'])->name('components.destroy');
 });
 
 Route::middleware(['auth', 'operator'])->group(function () {
@@ -51,6 +54,10 @@ Route::middleware(['auth', 'operator'])->group(function () {
     Route::post('/logdata/store', [ComponentController::class, 'storeLog'])->name('logdata.store');
     Route::get('/graphdata', [ComponentController::class, 'graphData'])->name('graphdata');
     Route::get('/component-logs/{componentId}', [ComponentController::class, 'getComponentLogs'])->name('component.logs');
+    
+    // Visualization routes for operator users
+    Route::get('/visualization', [LogdataController::class, 'logData'])->name('visualization.operator');
+    Route::post('/visualization/data', [LogdataController::class, 'visualizationData'])->middleware('api')->name('visualization.data.operator');
 });
 
 require __DIR__ . '/settings.php';
